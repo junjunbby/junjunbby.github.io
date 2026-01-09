@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Gravity Flip Platformer — MVP</title>
+<style>
+  :root{
+    --bg:#0b1220;
+    --sky:#8fd3ff;
+    --ground:#dbeaf1;
+    --panel:rgba(255,255,255,0.06);
+    --accent:#ffcc33;
+    --danger:#ff5a5a;
+    --coin:#ffd166;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(#0b1220,#071428);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:#eef}
+  .wrap{max-width:1100px;margin:20px auto;padding:12px;display:flex;gap:12px;align-items:flex-start;justify-content:center}
+  canvas{background:linear-gradient(var(--sky), #9fdfff 60%);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.5);display:block}
+  .ui{width:260px}
+  .panel{background:var(--panel);padding:12px;border-radius:10px}
+  h1{margin:0 0 8px 0;font-size:18px}
+  .hud-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .big{font-weight:800;font-size:18px}
+  .sm{font-size:13px;color:#cfe}
+  .controls{display:flex;gap:6px;margin-top:8px}
+  button{background:var(--accent);border:none;padding:8px 10px;border-radius:8px;color:#042;font-weight:800;cursor:pointer}
+  .small-muted{font-size:12px;color:#9fb}
+  .mobile-controls{display:flex;gap:8px;margin-top:12px}
+  .touch-btn{background:#ffffff11;border-radius:8px;padding:12px;min-width:56px;text-align:center;color:#fff}
+  footer{margin-top:10px;color:#9fb;font-size:12px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="960" height="600" tabindex="0"></canvas>
+
+    <div class="ui">
+      <div class="panel">
+        <h1>Gravity Flip — MVP</h1>
+        <div class="hud-row"><div class="sm">Score</div><div class="big" id="score">0</div></div>
+        <div class="hud-row"><div class="sm">Highscore</div><div class="big" id="high">0</div></div>
+        <div class="hud-row"><div class="sm">Lives</div><div class="big" id="lives">3</div></div>
+        <div class="hud-row"><div class="sm">Gravity</div><div id="gravDir" class="big">↓</div></div>
+        <div class="small-muted">Controls: A/D or ←/→ move • W / ↑ or Space jump • G flip gravity</div>
+        <div class="controls">
+          <button id="restart">Restart</button>
+          <button id="mute">Mute</button>
+        </div>
+        <div class="mobile-controls" id="mobileControls" style="display:none">
+          <div class="touch-btn" id="leftBtn">◀</div>
+          <div class="touch-btn" id="jumpBtn">Jump</div>
+          <div class="touch-btn" id="flipBtn">Flip</div>
+          <div class="touch-btn" id="rightBtn">▶</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:12px">
+        <div style="font-weight:800;margin-bottom:6px">Level preview</div>
+        <canvas id="minimap" width="220" height="120" style="background:#091a2b;border-radius:6px"></canvas>
+        <div class="small-muted" style="margin-top:8px">Reach the golden goal at the far right. Collect coins and avoid spikes.</div>
+      </div>
+
+      <footer>Prototype — Gravity flip mechanic, coins, simple hazards. Progress saved locally.</footer>
+    </div>
+  </div>
+
+<script>
+/*
+Gravity Flip Platformer — MVP
+- Canvas-based side-scrolling platformer.
+- Player can move left/right, jump, and flip gravity (toggle upward/downward gravity).
+- Collect coins, avoid spikes. Reach goal to finish level.
+- Simple physics, AABB collision, platform resolution.
+- LocalStorage for highscore.
+- Mobile touch controls optional.
+*/
+
+// ---- Config ----
+const CANVAS = document.getElementById('game');
+const ctx = CANVAS.getContext('2d');
+const W = CANVAS.width, H = CANVAS.height;
+const GRAVITY = 1200; // px/s^2 (positive = down)
+const MOVE_ACCEL = 2400; // px/s^2
+const MAX_RUN_SPEED = 260; // px/s
+const JUMP_SPEED = 460; // px/s initial jump velocity
+const MAX_FALL_SPEED = 900;
+const PLAYER_W = 36, PLAYER_H = 52;
+const COIN_RADIUS = 9;
+const LEVEL_LENGTH = 3000; // px
+
+// ---- State ----
+let score = 0;
+let highscore = parseInt(localStorage.getItem('gf_high') || '0', 10);
+let lives = 3;
+let gravityDirection = 1; // 1 = down, -1 = up
+let muted = false;
+
+// player physics state
+const player = {
+  x: 80, y: H - 160, vx:0, vy:0, w:PLAYER_W, h:PLAYER_H, grounded:false
+};
+
+// world objects arrays
+let platforms = [];
+let spikes = [];
+let coins = [];
+let goal = null;
+
+// camera offset for side-scrolling
+let camX = 0;
+
+// input
+const keys = { left:false, right:false, jump:false, flip:false };
+
+// time
+let last = performance.now();
+
+// touch controls detection
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
+if(isTouch) document.getElementById('mobileControls').style.display = 'flex';
+
+// HUD elements
+const scoreEl = document.getElementById('score');
+const highEl = document.getElementById('high');
+const livesEl = document.getElementById('lives');
+const gravEl = document.getElementById('gravDir');
+const muteBtn = document.getElementById('mute');
+
+highEl.textContent = highscore;
+
+// ---- Audio (simple) ----
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep(freq=440, time=0.08, vol=0.12){
+  if(muted) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = 'sine';
+  o.frequency.value = freq;
+  g.gain.value = 0;
+  o.connect(g); g.connect(audioCtx.destination);
+  const now = audioCtx.currentTime;
+  g.gain.linearRampToValueAtTime(vol, now + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, now + time + 0.02);
+  o.start(now); o.stop(now + time + 0.03);
+}
+window.addEventListener('pointerdown', ()=>{ if(audioCtx.state === 'suspended') audioCtx.resume(); }, { once:true });
+
+// ---- Level generation (simple linear layout) ----
+function buildLevel(){
+  platforms = [];
+  spikes = [];
+  coins = [];
+  // ground
+  platforms.push({x:0, y:H-100, w:LEVEL_LENGTH, h:20});
+  // some floating platforms
+  const plats = [
+    {x:220, y:H-220, w:160},
+    {x:420, y:H-300, w:120},
+    {x:620, y:H-180, w:220},
+    {x:1000, y:H-260, w:140},
+    {x:1280, y:H-200, w:170},
+    {x:1600, y:H-320, w:200},
+    {x:1900, y:H-220, w:140},
+    {x:2200, y:H-180, w:300},
+    {x:2600, y:H-260, w:180},
+  ];
+  plats.forEach(p=> platforms.push({x:p.x, y:p.y, w:p.w, h:16}));
+  // spikes (hazards)
+  spikes.push({x:520, y:H-100-12, w:32, h:12});
+  spikes.push({x:840, y:H-100-12, w:32, h:12});
+  spikes.push({x:1500, y:H-100-12, w:32, h:12});
+  spikes.push({x:2380, y:H-100-12, w:32, h:12});
+  // coins scattered
+  for(let i=0;i<40;i++){
+    const cx = 120 + Math.random()*(LEVEL_LENGTH-240);
+    const cy = H-150 - Math.random()*280;
+    coins.push({x:cx, y:cy, r:COIN_RADIUS, collected:false});
+  }
+  // goal near the end
+  goal = {x:LEVEL_LENGTH - 120, y:H-100-140, w:72, h:140};
+}
+buildLevel();
+
+// ---- collision helpers (AABB) ----
+function aabbIntersect(a,b){
+  return !(a.x+a.w < b.x || a.x > b.x+b.w || a.y+a.h < b.y || a.y > b.y+b.h);
+}
+function rectOverlap(ax,ay,aw,ah,bx,by,bw,bh){
+  return !(ax+aw < bx || ax > bx+bw || ay+ah < by || ay > by+bh);
+}
+
+// ---- Input handlers ----
+function keyDown(e){ 
+  if(e.code === 'ArrowLeft' || e.code==='KeyA') keys.left = true;
+  if(e.code === 'ArrowRight' || e.code==='KeyD') keys.right = true;
+  if(e.code === 'ArrowUp' || e.code==='KeyW' || e.code==='Space') keys.jump = true;
+  if(e.code === 'KeyG' || e.code === 'KeyF') keys.flip = true;
+}
+function keyUp(e){
+  if(e.code === 'ArrowLeft' || e.code==='KeyA') keys.left = false;
+  if(e.code === 'ArrowRight' || e.code==='KeyD') keys.right = false;
+  if(e.code === 'ArrowUp' || e.code==='KeyW' || e.code==='Space') keys.jump = false;
+  if(e.code === 'KeyG' || e.code === 'KeyF') keys.flip = false;
+}
+window.addEventListener('keydown', keyDown);
+window.addEventListener('keyup', keyUp);
+
+// mobile touch
+document.getElementById('leftBtn')?.addEventListener('touchstart', (e)=>{ keys.left=true; e.preventDefault(); });
+document.getElementById('leftBtn')?.addEventListener('touchend', (e)=>{ keys.left=false; e.preventDefault(); });
+document.getElementById('rightBtn')?.addEventListener('touchstart', (e)=>{ keys.right=true; e.preventDefault(); });
+document.getElementById('rightBtn')?.addEventListener('touchend', (e)=>{ keys.right=false; e.preventDefault(); });
+document.getElementById('jumpBtn')?.addEventListener('touchstart', (e)=>{ keys.jump=true; setTimeout(()=> keys.jump=false,120); e.preventDefault();});
+document.getElementById('flipBtn')?.addEventListener('touchstart', (e)=>{ flipGravity(); e.preventDefault(); });
+
+// ---- Gameplay functions ----
+function flipGravity(){
+  gravityDirection *= -1;
+  // invert vertical velocity optionally to retain momentum
+  player.vy = -player.vy * 0.9;
+  playBeep(520,0.06,0.12);
+  gravEl.textContent = gravityDirection > 0 ? '↓' : '↑';
+}
+
+function respawn(){
+  player.x = 80; player.y = H - 160; player.vx = 0; player.vy = 0; player.grounded = false;
+  lives = Math.max(0, lives-1);
+  livesEl.textContent = lives;
+  if(lives <= 0) {
+    // reset
+    if(score > highscore) { highscore = score; localStorage.setItem('gf_high', highscore); highEl.textContent = highscore; }
+    score = 0; updateScore();
+    lives = 3; livesEl.textContent = lives;
+    buildLevel();
+  }
+}
+
+// collect coin
+function collectCoin(c){
+  if(c.collected) return;
+  c.collected = true;
+  score += 1;
+  updateScore();
+  playBeep(880,0.07,0.12);
+}
+
+// reach goal
+let levelFinished = false;
+function checkGoal(){
+  if(rectOverlap(player.x, player.y, player.w, player.h, goal.x, goal.y, goal.w, goal.h)){
+    if(!levelFinished){
+      levelFinished = true;
+      playBeep(980,0.12,0.18);
+      // award bonus
+      score += 15;
+      updateScore();
+      setTimeout(()=> {
+        alert('Level complete! Score: ' + score);
+        // new run
+        if(score > highscore){ highscore = score; localStorage.setItem('gf_high', highscore); highEl.textContent = highscore; }
+        score = 0; updateScore();
+        levelFinished = false;
+        buildLevel();
+        respawn();
+      }, 200);
+    }
+  }
+}
+
+// update score display
+function updateScore(){ scoreEl.textContent = score; highEl.textContent = highscore; }
+
+// ---- Physics & collision resolution ----
+function physicsStep(dt){
+  // horizontal control
+  let ax = 0;
+  if(keys.left) ax -= MOVE_ACCEL;
+  if(keys.right) ax += MOVE_ACCEL;
+
+  // apply horizontal acceleration + drag
+  player.vx += ax * dt;
+  // clamp
+  if(player.vx > MAX_RUN_SPEED) player.vx = MAX_RUN_SPEED;
+  if(player.vx < -MAX_RUN_SPEED) player.vx = -MAX_RUN_SPEED;
+
+  // gravity
+  player.vy += (GRAVITY * gravityDirection) * dt;
+  if(player.vy > MAX_FALL_SPEED) player.vy = MAX_FALL_SPEED;
+  if(player.vy < -MAX_FALL_SPEED) player.vy = -MAX_FALL_SPEED;
+
+  // jump (only if grounded and press)
+  if(keys.jump && player.grounded){
+    player.vy = -JUMP_SPEED * gravityDirection; // invert sign to jump opposite gravity
+    player.grounded = false;
+    playBeep(720, 0.08, 0.12);
+  }
+
+  // flip gravity on key press (single action)
+  if(keys.flip){
+    // debounce with a tiny cooldown using property
+    if(!player._flipCooldown){
+      flipGravity();
+      player._flipCooldown = true;
+      setTimeout(()=> player._flipCooldown = false, 220);
+    }
+  }
+
+  // integrate
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  // camera follow
+  camX = Math.max(0, player.x - 220);
+
+  // world bounds X
+  if(player.x < 0) player.x = 0, player.vx = 0;
+  if(player.x + player.w > LEVEL_LENGTH) player.x = LEVEL_LENGTH - player.w, player.vx = 0;
+
+  // collisions: simple AABB resolution against platforms
+  player.grounded = false;
+  for(const p of platforms){
+    if(rectOverlap(player.x, player.y, player.w, player.h, p.x, p.y, p.w, p.h)){
+      // compute penetration
+      const overlapX = Math.min(player.x+player.w - p.x, p.x+p.w - player.x);
+      const overlapY = Math.min(player.y+player.h - p.y, p.y+p.h - player.y);
+      if(overlapX < overlapY){
+        // resolve X
+        if(player.x < p.x) player.x -= overlapX; else player.x += overlapX;
+        player.vx = 0;
+      } else {
+        // resolve Y; direction-sensitive
+        if( (player.y < p.y && gravityDirection>0) || (player.y > p.y && gravityDirection<0) ){
+          // landing on top relative to gravity
+          if(gravityDirection > 0){
+            player.y = p.y - player.h;
+          } else {
+            player.y = p.y + p.h;
+          }
+          player.vy = 0;
+          player.grounded = true;
+        } else {
+          // hitting underside (if flipped), push away
+          if(gravityDirection > 0){
+            player.y = p.y + p.h;
+            player.vy = 0;
+          } else {
+            player.y = p.y - player.h;
+            player.vy = 0;
+          }
+        }
+      }
+    }
+  }
+
+  // spikes collision
+  for(const s of spikes){
+    if(rectOverlap(player.x, player.y, player.w, player.h, s.x, s.y, s.w, s.h)){
+      // die / respawn
+      playBeep(180,0.12,0.2);
+      respawn();
+      break;
+    }
+  }
+
+  // coins collection
+  coins.forEach(c=>{
+    if(!c.collected && rectOverlap(player.x, player.y, player.w, player.h, c.x - c.r, c.y - c.r, c.r*2, c.r*2)){
+      collectCoin(c);
+    }
+  });
+
+  // fall off bounds vertically -> respawn
+  if(player.y > H + 300 || player.y < -400){
+    respawn();
+  }
+
+  // goal
+  checkGoal();
+}
+
+// ---- Rendering ----
+function draw(){
+  // clear
+  ctx.clearRect(0,0,W,H);
+  // sky gradient background handled by CSS; draw parallax simple
+  // translate camera
+  ctx.save();
+  ctx.translate(-camX, 0);
+
+  // draw ground platforms
+  for(const p of platforms){
+    ctx.fillStyle = '#2b6b47';
+    // main ground uses darker color when large width
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    // top highlight
+    ctx.fillStyle = '#7ee07a22';
+    ctx.fillRect(p.x, p.y, p.w, 4);
+  }
+
+  // draw spikes
+  for(const s of spikes){
+    ctx.fillStyle = 'rgba(255,90,90,0.95)';
+    // simple triangles
+    const steps = Math.floor(s.w / 16);
+    const stepW = s.w / steps;
+    for(let i=0;i<steps;i++){
+      const sx = s.x + i*stepW;
+      ctx.beginPath();
+      if(true){
+        // point up (spikes sit on ground)
+        ctx.moveTo(sx, s.y + s.h);
+        ctx.lineTo(sx + stepW/2, s.y);
+        ctx.lineTo(sx + stepW, s.y + s.h);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // draw coins
+  for(const c of coins){
+    if(c.collected) continue;
+    ctx.beginPath();
+    ctx.fillStyle = 'gold';
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#fff7';
+    ctx.stroke();
+  }
+
+  // draw goal
+  ctx.fillStyle = '#ffdf6f';
+  ctx.fillRect(goal.x, goal.y, goal.w, goal.h);
+  ctx.fillStyle = '#7a5a00';
+  ctx.fillRect(goal.x + goal.w/2 - 8, goal.y + 6, 16, goal.h - 12);
+
+  // draw player
+  ctx.fillStyle = '#3f9cff';
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+  // face indicator
+  ctx.fillStyle = '#033';
+  ctx.fillRect(player.x + player.w/2 - 4, player.y + player.h/2 - 4, 8, 8);
+
+  // small shadow / indicator depending on gravity
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  if(gravityDirection > 0){
+    ctx.fillRect(player.x + 6, player.y + player.h + 4, player.w - 12, 6);
+  } else {
+    ctx.fillRect(player.x + 6, player.y - 10, player.w - 12, 6);
+  }
+
+  ctx.restore();
+
+  // HUD overlays (score handled by DOM)
+}
+
+// ---- Main loop ----
+let running = true;
+function frame(now){
+  const dt = Math.min(0.033, (now - last) / 1000);
+  last = now;
+  if(running){
+    physicsStep(dt);
+    draw();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- Init & UI bindings ----
+document.getElementById('restart').addEventListener('click', ()=>{
+  score = 0; updateScore();
+  lives = 3; livesEl.textContent = lives;
+  buildLevel();
+  respawn();
+});
+muteBtn.addEventListener('click', ()=>{
+  muted = !muted;
+  muteBtn.textContent = muted ? 'Unmute' : 'Mute';
+});
+
+// mobile UI elements (if exist)
+const leftBtn = document.getElementById('leftBtn');
+if(leftBtn){
+  leftBtn.addEventListener('touchstart', ()=> keys.left = true);
+  leftBtn.addEventListener('touchend', ()=> keys.left = false);
+}
+const rightBtn = document.getElementById('rightBtn');
+if(rightBtn){
+  rightBtn.addEventListener('touchstart', ()=> keys.right = true);
+  rightBtn.addEventListener('touchend', ()=> keys.right = false);
+}
+const jumpBtn = document.getElementById('jumpBtn');
+if(jumpBtn){
+  jumpBtn.addEventListener('touchstart', ()=> { keys.jump = true; setTimeout(()=> keys.jump = false, 120); });
+}
+const flipBtn = document.getElementById('flipBtn');
+if(flipBtn) flipBtn.addEventListener('touchstart', (e)=> { flipGravity(); e.preventDefault(); });
+
+// ---- Populate minimap (simple) ----
+const mini = document.getElementById('minimap');
+const mctx = mini.getContext('2d');
+function renderMinimap(){
+  mctx.clearRect(0,0,mini.width,mini.height);
+  mctx.fillStyle = '#0c2430'; mctx.fillRect(0,0,mini.width,mini.height);
+  const scale = mini.width / LEVEL_LENGTH;
+  // platforms
+  mctx.fillStyle = '#3fa76a';
+  platforms.forEach(p=>{
+    mctx.fillRect(p.x*scale, p.y*0.35, p.w*scale, 6);
+  });
+  // player
+  mctx.fillStyle = '#4fb3ff';
+  mctx.fillRect(player.x*scale, 18, 6, 6);
+  // goal
+  mctx.fillStyle = '#ffd166';
+  mctx.fillRect(goal.x*scale, 14, goal.w*scale, 8);
+}
+setInterval(renderMinimap, 500);
+
+// ---- Score update loop & coin init ----
+function initCoins(){ coins.forEach(c=> c.collected = false); updateScore(); }
+initCoins();
+
+function updateScore(){ scoreEl.textContent = score; highEl.textContent = highscore; }
+
+// ---- Save highscore on exit ----
+window.addEventListener('beforeunload', ()=>{
+  if(score > highscore) localStorage.setItem('gf_high', score);
+});
+
+// ---- initial HUD ----
+updateHUD();
+livesEl.textContent = lives;
+gravEl.textContent = gravityDirection>0 ? '↓' : '↑';
+
+</script>
+</body>
+</html>
