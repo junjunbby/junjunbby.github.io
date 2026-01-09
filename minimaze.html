@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Mini-Maze 2.5D Arcade Fixed</title>
+<title>Mini-Maze 2.5D Arcade Working</title>
 <style>
 body { margin:0; overflow:hidden; font-family:sans-serif; touch-action: none; background:#222; }
 #ui {
@@ -16,7 +16,7 @@ body { margin:0; overflow:hidden; font-family:sans-serif; touch-action: none; ba
 </head>
 <body>
 <div id="ui">
-  <h3>Mini-Maze 2.5D Arcade Fixed</h3>
+  <h3>Mini-Maze 2.5D Arcade</h3>
   <p>Arrow keys / WASD / swipe: move</p>
   <p id="status">Level: 1 | Score: 0 | Time: 30 | Highscore: 0</p>
 </div>
@@ -24,8 +24,7 @@ body { margin:0; overflow:hidden; font-family:sans-serif; touch-action: none; ba
 <!-- Audio -->
 <audio id="starSound" src="https://freesound.org/data/previews/320/320655_5260876-lq.mp3"></audio>
 <audio id="trapSound" src="https://freesound.org/data/previews/198/198841_2859976-lq.mp3"></audio>
-<audio id="exitSound" src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3"></audio>
-<audio id="levelUpSound" src="https://freesound.org/data/previews/146/146725_2615114-lq.mp3"></audio> <!-- New level-up sound -->
+<audio id="levelUpSound" src="https://freesound.org/data/previews/146/146725_2615114-lq.mp3"></audio>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
@@ -77,8 +76,13 @@ function generateMaze(){
   mazeMap=Array(gridSize).fill(0).map(()=>Array(gridSize).fill(0));
   stars=[]; traps=[];
 
-  // Remove previous objects
-  scene.children = scene.children.filter(c => c.type!=="Mesh" || c.geometry.type==="PlaneGeometry");
+  // Remove previous walls/stars/traps
+  for(let i=scene.children.length-1;i>=0;i--){
+    const obj = scene.children[i];
+    if(obj.userData && obj.userData.type && ["wall","star","trap"].includes(obj.userData.type)){
+      scene.remove(obj);
+    }
+  }
 
   for(let y=0;y<gridSize;y++){
     for(let x=0;x<gridSize;x++){
@@ -98,14 +102,18 @@ function createWall(x,y){
   const cube = new THREE.Mesh(new THREE.BoxGeometry(cellSize,cellSize*0.7,cellSize),
     new THREE.MeshStandardMaterial({color:0x555555}));
   cube.position.set(x*cellSize+cellSize/2,cellSize*0.35,y*cellSize+cellSize/2);
-  cube.castShadow=true; scene.add(cube);
+  cube.castShadow=true;
+  cube.userData.type="wall";
+  scene.add(cube);
 }
 
 function createStar(x,y){
   const star = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/2,cellSize/2),
     new THREE.MeshStandardMaterial({color:0xffff00}));
   star.position.set(x*cellSize+cellSize/2,cellSize/4,y*cellSize+cellSize/2);
-  star.castShadow=true; scene.add(star);
+  star.castShadow=true;
+  star.userData.type="star";
+  scene.add(star);
   stars.push({x,y,mesh:star});
 }
 
@@ -113,7 +121,9 @@ function createTrap(x,y){
   const trap = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/4,cellSize/2),
     new THREE.MeshStandardMaterial({color:0x5555ff, emissive:0x0000ff, emissiveIntensity:0.3}));
   trap.position.set(x*cellSize+cellSize/2,cellSize/8,y*cellSize+cellSize/2);
-  trap.castShadow=true; scene.add(trap);
+  trap.castShadow=true;
+  trap.userData.type="trap";
+  scene.add(trap);
   traps.push({x,y,mesh:trap});
 }
 
