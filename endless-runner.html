@@ -1,1 +1,921 @@
-...
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Endless Runner — Single File Prototype</title>
+<style>
+  :root{
+    --ui-bg: rgba(0,0,0,0.6);
+    --btn: #2ecc71;
+    --muted: #bbb;
+    --panel: rgba(255,255,255,0.04);
+  }
+  html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  #container{display:flex;align-items:center;justify-content:center;height:100%;background:#111;}
+  canvas{background:#87ceeb;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.6);max-width:100%;height:auto;}
+  /* Overlay UI */
+  .overlay{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+  .panel{width:920px;max-width:92vw;background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.5));border-radius:10px;padding:18px;box-shadow:0 6px 20px rgba(0,0,0,0.7);pointer-events:auto;color:#fff;}
+  .row{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+  h1{margin:0;font-size:20px}
+  button{background:var(--btn);border:none;padding:8px 12px;border-radius:6px;cursor:pointer;color:#032; font-weight:600;}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+  .right{margin-left:auto}
+  .hud{position:absolute;top:12px;left:12px;color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,0.6)}
+  .hud-right{position:absolute;top:12px;right:12px;color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,0.6)}
+  .menu-btn{background:linear-gradient(180deg,#5bd07a,#2db35d)}
+  .secondary{background:transparent;border:1px solid rgba(255,255,255,0.08);color:#fff;padding:6px 10px;border-radius:6px}
+  .skins{display:flex;gap:8px;flex-wrap:wrap}
+  .skin-tile{width:84px;height:84px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;background:var(--panel);cursor:pointer;border:2px solid transparent}
+  .skin-tile.locked{opacity:0.55;filter:grayscale(0.2)}
+  .skin-preview{width:44px;height:44px;border-radius:8px;margin-bottom:6px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap}
+  .footer{margin-top:8px;color:var(--muted);font-size:12px}
+  .big{font-size:28px}
+  .center{text-align:center}
+  .inline{display:inline-block;margin-right:10px}
+  /* Mobile hint */
+  .touch-hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:var(--ui-bg);color:#fff;padding:8px 12px;border-radius:999px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="container">
+  <canvas id="game" width="920" height="460"></canvas>
+  <div class="overlay" id="uiOverlay" style="pointer-events:none"></div>
+  <div class="hud" id="hudLeft">Score: 0</div>
+  <div class="hud-right" id="hudRight">Highscore: 0</div>
+  <div class="touch-hint" id="touchHint" style="display:none">Tap to jump • Swipe left/right to change lanes • Swipe down to slide</div>
+</div>
+
+<!-- Menus are appended programmatically inside #uiOverlay -->
+<script>
+/*
+Endless Runner — Single-file prototype
+Features:
+- Canvas rendering, requestAnimationFrame
+- Controls: Space/Arrow Up to jump, Arrow Down to slide, Arrow Left/Right to change lane
+- Touch support: tap to jump, swipe to change lanes or slide
+- Skins with unlocks persisted in localStorage
+- Worlds (Forest, Desert, Ice) cycle automatically by distance or selectable in menu
+- Power-ups: Speed Boost, Shield, Coin Magnet
+- Coins collectible, stored in localStorage, used to unlock skins
+- Highscore stored in localStorage
+- Procedural obstacles and collectibles
+- Simple synthesized sounds via WebAudio (no external files)
+*/
+
+(() => {
+  // Config & state
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  let W = canvas.width, H = canvas.height;
+  const uiOverlay = document.getElementById('uiOverlay');
+  const hudLeft = document.getElementById('hudLeft');
+  const hudRight = document.getElementById('hudRight');
+  const touchHint = document.getElementById('touchHint');
+
+  // Local storage keys
+  const LS = {
+    HIGHSCORE: 'er_highscore_v1',
+    COINS: 'er_coins_v1',
+    SELECTED_SKIN: 'er_selected_skin_v1',
+    UNLOCKED: 'er_unlocked_skins_v1'
+  };
+
+  // Initial persisted values
+  let highscore = parseInt(localStorage.getItem(LS.HIGHSCORE) || '0', 10);
+  let savedCoins = parseInt(localStorage.getItem(LS.COINS) || '0', 10);
+  hudRight.textContent = `Highscore: ${highscore}`;
+
+  // Audio SFX generator (WebAudio)
+  const SFX = (() => {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    function playOsc({type='sine', freq=440, time=0.08, vol=0.12, release=0.08, detune=0}) {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = type; o.frequency.value = freq; o.detune.value = detune;
+      g.gain.value = 0;
+      o.connect(g); g.connect(ctx.destination);
+      const now = ctx.currentTime;
+      g.gain.linearRampToValueAtTime(vol, now + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, now + time + release);
+      o.start(now); o.stop(now + time + release + 0.01);
+    }
+    return {
+      jump(){ playOsc({type:'sine', freq:420, time:0.12, vol:0.14, release:0.06}); },
+      coin(){ playOsc({type:'triangle', freq:880, time:0.08, vol:0.12, release:0.04}); playOsc({type:'sine', freq:1320, time:0.06, vol:0.06, release:0.02, detune:30}); },
+      hit(){ playOsc({type:'square', freq:120, time:0.22, vol:0.16, release:0.2}); },
+      power(){ playOsc({type:'sawtooth', freq:620, time:0.2, vol:0.12, release:0.12}); },
+      ui(){ playOsc({type:'sine', freq:720, time:0.06, vol:0.06, release:0.02}); }
+    };
+  })();
+
+  // Utility
+  const rand = (a,b) => Math.random()*(b-a)+a;
+  const pick = (arr) => arr[Math.floor(Math.random()*arr.length)];
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+  // Game constants
+  const LANE_COUNT = 3;
+  const LANE_X = []; // computed
+  const GROUND_H = 120;
+  const GRAVITY = 2200; // px/s^2
+  const BASE_SPEED = 320; // px/s
+  const SPEED_INCREASE_PER_METER = 0.6; // scaling per 100m
+  const WORLD_CHANGE_DISTANCE = 600; // meters to switch world automatically
+
+  // Skins definition
+  const SKINS = [
+    { id: 'default', name:'Runner', color:'#ffcc33', bg:'#222', unlocked:true },
+    { id: 'blue', name:'Azure', color:'#4db8ff', bg:'#042b4f', unlocked:false, costCoins:25 },
+    { id: 'ninja', name:'Ninja', color:'#111', border:'#f6f6f6', unlocked:false, costScore:800 },
+    { id: 'sunset', name:'Sunset', color:'#ff7f50', unlocked:false, costCoins:60 },
+  ];
+
+  // Worlds
+  const WORLDS = [
+    { id:'forest', name:'Forest', bgTop:'#b3f0c1', bgBottom:'#3a6b3a', ground:'#2e7d32', deco:['tree','bush'], obstacleColor:'#3a2f1b', friction:1.0 },
+    { id:'desert', name:'Desert', bgTop:'#ffe9b5', bgBottom:'#d49a4b', ground:'#c6892b', deco:['cactus','dune'], obstacleColor:'#6b3e18', friction:1.0 },
+    { id:'ice', name:'Ice', bgTop:'#e6f7ff', bgBottom:'#bfe7ff', ground:'#99d6ff', deco:['snow'], obstacleColor:'#a0c8d8', friction:0.92 }
+  ];
+
+  // Persisted unlocked skins
+  let unlockedSkins = JSON.parse(localStorage.getItem(LS.UNLOCKED) || 'null');
+  if (!unlockedSkins) {
+    unlockedSkins = {};
+    SKINS.forEach(s=> { unlockedSkins[s.id] = !!s.unlocked; });
+    localStorage.setItem(LS.UNLOCKED, JSON.stringify(unlockedSkins));
+  }
+
+  // Selected skin
+  let selectedSkin = localStorage.getItem(LS.SELECTED_SKIN) || 'default';
+  if (!unlockedSkins[selectedSkin]) selectedSkin = 'default';
+
+  // Game state
+  let running = false;
+  let paused = false;
+  let lastTime = 0;
+  let dtAcc = 0;
+  let distance = 0; // in meters (we'll scale px->meters)
+  let meters = 0;
+  let speed = BASE_SPEED;
+  let coins = savedCoins || 0;
+  let score = 0;
+  let worldIndex = 0;
+  let world = WORLDS[worldIndex];
+  let spawnTimer = 0;
+  let spawnInterval = 1.0; // seconds
+  let obstacles = [];
+  let coinsArr = [];
+  let powerups = [];
+  let particles = [];
+
+  // Entities
+  class Player {
+    constructor(){
+      this.w = 44; this.h = 64;
+      this.x = 160; this.y = H - GROUND_H - this.h;
+      this.vy = 0;
+      this.onGround = true;
+      this.jumping = false;
+      this.slide = false;
+      this.slideTimer = 0;
+      this.lane = 1; // 0..LANE_COUNT-1
+      this.targetX = 0;
+      this.skin = selectedSkin;
+      this.shield = 0;
+      this.magnet = 0;
+      this.speedBoost = 0;
+    }
+    reset(){
+      this.w = 44; this.h = 64;
+      this.x = 160; this.y = H - GROUND_H - this.h;
+      this.vy = 0;
+      this.onGround = true;
+      this.jumping = false;
+      this.slide = false;
+      this.slideTimer = 0;
+      this.lane = 1;
+      this.targetX = 0;
+      this.shield = 0;
+      this.magnet = 0;
+      this.speedBoost = 0;
+    }
+    update(dt){
+      // lane position interpolation
+      this.targetX = LANE_X[this.lane] - this.w/2;
+      this.x += (this.targetX - this.x) * clamp(dt*12, 0, 1);
+
+      // vertical physics
+      if(!this.onGround){
+        this.vy += GRAVITY*dt;
+        this.y += this.vy * dt;
+        if(this.y >= H - GROUND_H - this.h){
+          this.y = H - GROUND_H - this.h;
+          this.onGround = true; this.vy = 0; this.jumping = false;
+        }
+      }
+
+      // slide handling
+      if(this.slide){
+        this.slideTimer -= dt;
+        if(this.slideTimer <= 0){ this.slide = false; this.h = 64; this.y -= 20; }
+      }
+
+      // power-up timers
+      if(this.shield > 0) this.shield = Math.max(0, this.shield - dt);
+      if(this.magnet > 0) this.magnet = Math.max(0, this.magnet - dt);
+      if(this.speedBoost > 0) this.speedBoost = Math.max(0, this.speedBoost - dt);
+    }
+    draw(ctx){
+      // body
+      const skin = SKINS.find(s=>s.id===this.skin) || SKINS[0];
+      const px = Math.round(this.x), py = Math.round(this.y);
+      // shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(px + this.w*0.5, H-GROUND_H+6, this.w*0.65, 8, 0,0,Math.PI*2);
+      ctx.fill();
+
+      // shield
+      if(this.shield>0){
+        const a = 0.45 + 0.55*(Math.sin(Date.now()/120));
+        ctx.strokeStyle = `rgba(100,200,255,${a})`;
+        ctx.lineWidth = 4;
+        roundRect(ctx, px-6, py-4, this.w+12, this.h+8, 10); ctx.stroke();
+      }
+
+      // body rectangle
+      ctx.fillStyle = skin.color || '#ffcc33';
+      roundRect(ctx, px, py, this.w, this.h, 8); ctx.fill();
+
+      // face / detail
+      ctx.fillStyle = skin.border || 'rgba(0,0,0,0.08)';
+      ctx.fillRect(px+8, py+16, this.w-16, 6);
+
+      // sliding visual
+      if(this.slide){
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(px, py+this.h-10, this.w, 8);
+      }
+    }
+    jump(){
+      if(this.onGround && !this.slide){ this.vy = -720; this.onGround = false; this.jumping = true; SFX.jump(); }
+    }
+    doSlide(){
+      if(this.onGround && !this.slide){
+        this.slide = true; this.slideTimer = 0.5;
+        this.y += 20; this.h = 44;
+        SFX.ui();
+      }
+    }
+    changeLane(dir){ // -1 left, +1 right
+      this.lane = clamp(this.lane + dir, 0, LANE_COUNT-1);
+    }
+    getBounds(){
+      return {x:this.x, y:this.y, w:this.w, h:this.h};
+    }
+    applyPower(type, duration){
+      if(type==='shield'){ this.shield = duration; }
+      if(type==='magnet'){ this.magnet = duration; }
+      if(type==='speed'){ this.speedBoost = duration; }
+      SFX.power();
+    }
+  }
+
+  class Obstacle {
+    constructor(x,y,w,h,type='block', moving=false){
+      this.x = x; this.y = y; this.w = w; this.h = h;
+      this.type = type; this.moving = moving;
+      this.vx = moving? -60 : 0;
+      this.alive = true;
+      this.osc = Math.random()*Math.PI*2;
+    }
+    update(dt){
+      this.x -= speed * dt;
+      if(this.moving){
+        this.osc += dt*3;
+        this.y += Math.sin(this.osc) * 8 * dt * 60;
+      }
+      if(this.x + this.w < -200) this.alive = false;
+    }
+    draw(ctx){
+      ctx.fillStyle = world.obstacleColor;
+      roundRect(ctx, Math.round(this.x), Math.round(this.y), Math.round(this.w), Math.round(this.h), 6);
+      ctx.fill();
+      if(this.type==='spike'){
+        // spikes: draw triangles
+        ctx.fillStyle = '#111';
+        const spikeW = Math.min(18, this.w/3);
+        for(let i=0;i<Math.floor(this.w/spikeW);i++){
+          const sx = this.x + i*spikeW;
+          ctx.beginPath();
+          ctx.moveTo(sx, this.y+this.h);
+          ctx.lineTo(sx+spikeW/2, this.y);
+          ctx.lineTo(sx+spikeW, this.y+this.h);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+    getBounds(){ return {x:this.x,y:this.y,w:this.w,h:this.h}; }
+  }
+
+  class Coin {
+    constructor(x,y){
+      this.x = x; this.y = y; this.r = 10; this.alive=true; this.osc=0;
+    }
+    update(dt){
+      this.x -= speed * dt;
+      this.osc += dt*8;
+      this.y += Math.sin(this.osc) * 0.6;
+      if(this.x + this.r < -100) this.alive=false;
+    }
+    draw(ctx){
+      const gx = ctx.createLinearGradient(this.x-this.r,this.y,this.x+this.r,this.y);
+      gx.addColorStop(0,'#ffdf6f'); gx.addColorStop(1,'#ffb200');
+      ctx.fillStyle = gx;
+      ctx.beginPath(); ctx.ellipse(this.x,this.y,this.r,this.r,0,0,Math.PI*2); ctx.fill();
+      // inner shine
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.ellipse(this.x-3,this.y-3,this.r*0.4,this.r*0.4,0,0,Math.PI*2); ctx.fill();
+    }
+    getBounds(){ return {x:this.x-this.r,y:this.y-this.r,w:this.r*2,h:this.r*2}; }
+  }
+
+  class PowerUp {
+    constructor(x,y,type){
+      this.x = x; this.y = y; this.w=28; this.h=28; this.type = type; this.alive=true; this.osc=0;
+    }
+    update(dt){
+      this.x -= speed * dt;
+      this.osc += dt*6;
+      if(this.x + this.w < -200) this.alive=false;
+    }
+    draw(ctx){
+      // box or icon
+      const col = this.type==='shield' ? '#59c0ff' : (this.type==='magnet' ? '#ffd166' : '#ff7b7b');
+      roundRect(ctx, this.x, this.y, this.w, this.h, 6); ctx.fillStyle = col; ctx.fill();
+      // small icon
+      ctx.fillStyle = '#222';
+      if(this.type==='shield'){
+        ctx.beginPath(); ctx.arc(this.x+this.w/2, this.y+this.h/2, 6, 0, Math.PI*2); ctx.fill();
+      } else if(this.type==='magnet'){
+        ctx.beginPath(); ctx.arc(this.x+this.w/2-2, this.y+this.h/2, 6, Math.PI*0.2, Math.PI*1.8); ctx.strokeStyle='#222'; ctx.lineWidth=3; ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.moveTo(this.x+6,this.y+8); ctx.lineTo(this.x+22,this.y+8); ctx.lineTo(this.x+14,this.y+22); ctx.fill();
+      }
+    }
+    getBounds(){ return {x:this.x,y:this.y,w:this.w,h:this.h}; }
+  }
+
+  // Simple rounded rect helper
+  function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  // Player instance
+  const player = new Player();
+
+  // Setup lanes based on canvas width
+  function computeLanes(){
+    const left = 280;
+    const right = W - 120;
+    for(let i=0;i<LANE_COUNT;i++){
+      LANE_X[i] = left + (right-left) * (i/(LANE_COUNT-1));
+    }
+    player.x = LANE_X[player.lane] - player.w/2;
+  }
+
+  // Reset game
+  function resetGame(){
+    running = true;
+    distance = 0; meters = 0; score = 0;
+    speed = BASE_SPEED;
+    spawnTimer = 0; spawnInterval = 1.0;
+    obstacles = []; coinsArr=[]; powerups=[]; particles=[];
+    player.reset();
+    worldIndex = 0; world = WORLDS[worldIndex];
+    lastTime = performance.now();
+    SFX.ui();
+  }
+
+  // Spawn logic
+  function spawnEntities(){
+    // difficulty scaling based on meters
+    const difficulty = 1 + (meters/200);
+    // spawn obstacles occasionally
+    if(Math.random() < 0.2 + 0.05*Math.min(5, meters/100)){
+      const lane = Math.floor(rand(0,LANE_COUNT));
+      const baseY = H - GROUND_H - 44;
+      const type = Math.random()<0.12 ? 'spike' : (Math.random()<0.12?'enemy':'block');
+      const w = type==='spike' ? rand(36,80) : rand(36,84);
+      const h = type==='spike' ? rand(28,44) : rand(48,90);
+      const x = W + rand(40,160);
+      const y = type==='spike' ? H - GROUND_H - h : (H - GROUND_H - h);
+      obstacles.push(new Obstacle(x, y, w, h, type, Math.random()<0.12));
+    }
+    // spawn coins cluster
+    if(Math.random() < 0.45){
+      const count = Math.floor(rand(1,4));
+      const startX = W + rand(80,240);
+      for(let i=0;i<count;i++){
+        const lane = Math.floor(rand(0,LANE_COUNT));
+        const x = startX + i*28;
+        const y = H - GROUND_H - 40 - lane*18 - rand(-20,40);
+        coinsArr.push(new Coin(x,y));
+      }
+    }
+    // spawn power-up rarely
+    if(Math.random() < 0.04 + 0.001*meters){
+      const x = W + rand(120,320);
+      const y = H - GROUND_H - rand(80,220);
+      const types = ['shield','magnet','speed'];
+      powerups.push(new PowerUp(x,y,pick(types)));
+    }
+  }
+
+  // Collision helpers
+  function intersects(a,b){
+    return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h);
+  }
+
+  // Main update loop
+  function update(now){
+    if(!running) return;
+    const dt = Math.min(0.035, (now - lastTime)/1000);
+    lastTime = now;
+
+    // speed scale with distance (meters)
+    speed = BASE_SPEED + Math.floor(meters/20) * 6 + (player.speedBoost>0 ? 140 : 0);
+    // update distance and score
+    distance += (speed/100) * dt; // px->meters fudge
+    meters = Math.floor(distance);
+    score = Math.floor(distance*1.2 + coins*2); // simple scoring
+    hudLeft.textContent = `Score: ${score}  •  Coins: ${coins}`;
+    hudRight.textContent = `Highscore: ${highscore}`;
+
+    // periodic world change
+    if(meters > 0 && Math.floor(meters / WORLD_CHANGE_DISTANCE) !== Math.floor((meters - (speed*dt)/100) / WORLD_CHANGE_DISTANCE)){
+      worldIndex = (worldIndex + 1) % WORLDS.length;
+      world = WORLDS[worldIndex];
+    }
+
+    // spawn timing
+    spawnTimer -= dt;
+    if(spawnTimer <= 0){
+      spawnTimer = clamp(0.6 - Math.min(0.45, meters/1000), 0.45, 1.4);
+      spawnEntities();
+    }
+
+    // update entities
+    player.update(dt);
+
+    obstacles.forEach(o=>o.update(dt));
+    coinsArr.forEach(c=>c.update(dt));
+    powerups.forEach(p=>p.update(dt));
+    particles.forEach(p=>{ p.life -= dt; p.x -= speed*dt; });
+
+    // magnet effect: pull coins within radius
+    if(player.magnet > 0){
+      const r = 140;
+      for(let c of coinsArr){
+        const dx = (player.x + player.w/2) - c.x;
+        const dy = (player.y + player.h/2) - c.y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if(d < r){
+          c.x += dx * 6 * dt;
+          c.y += dy * 6 * dt;
+        }
+      }
+    }
+
+    // collisions: player with coins
+    for(let c of coinsArr){
+      if(!c.alive) continue;
+      if(intersects(player.getBounds(), c.getBounds())){
+        c.alive = false; coins++; SFX.coin();
+      }
+    }
+    // collisions: player with powerups
+    for(let p of powerups){
+      if(!p.alive) continue;
+      if(intersects(player.getBounds(), p.getBounds())){
+        p.alive = false;
+        if(p.type==='shield') player.applyPower('shield', 4);
+        if(p.type==='magnet') player.applyPower('magnet', 5);
+        if(p.type==='speed') player.applyPower('speed', 2.8);
+      }
+    }
+
+    // collisions: player with obstacles
+    for(let o of obstacles){
+      if(!o.alive) continue;
+      if(intersects(player.getBounds(), o.getBounds())){
+        if(player.shield > 0){
+          // destroy obstacle
+          o.alive = false;
+          player.shield = 0;
+          SFX.power();
+        } else {
+          // game over
+          SFX.hit();
+          running = false;
+          endGame();
+          return;
+        }
+      }
+    }
+
+    // cleanup arrays
+    obstacles = obstacles.filter(o=>o.alive);
+    coinsArr = coinsArr.filter(c=>c.alive);
+    powerups = powerups.filter(p=>p.alive);
+    particles = particles.filter(p=>p.life>0);
+
+    // rendering
+    render();
+
+    requestAnimationFrame(update);
+  }
+
+  // Drawing background
+  function drawBackground(ctx){
+    // gradient sky by world
+    const g = ctx.createLinearGradient(0,0,0,H-GROUND_H);
+    g.addColorStop(0, world.bgTop);
+    g.addColorStop(1, world.bgBottom);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H-GROUND_H);
+
+    // simple parallax elements (decor)
+    const decoCount = 6;
+    ctx.save();
+    for(let i=0;i<decoCount;i++){
+      const px = (i*270 + (Date.now()/50 % 270)) % (W+300) - 200;
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      if(world.deco.includes('tree')){
+        ctx.fillRect(px, H-GROUND_H-120, 20, 80);
+        ctx.beginPath(); ctx.arc(px+10, H-GROUND_H-140, 36, 0, Math.PI*2); ctx.fill();
+      } else if(world.deco.includes('cactus')){
+        ctx.fillStyle = '#5a8a3b';
+        ctx.fillRect(px, H-GROUND_H-80, 12, 48);
+      } else if(world.deco.includes('snow')){
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.beginPath(); ctx.arc(px, H-GROUND_H-60, 28, 0, Math.PI*2); ctx.fill();
+      } else {
+        ctx.fillRect(px, H-GROUND_H-40, 40, 20);
+      }
+    }
+    ctx.restore();
+
+    // ground
+    ctx.fillStyle = world.ground;
+    ctx.fillRect(0,H-GROUND_H,W,GROUND_H);
+    // ground texture lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+    ctx.lineWidth = 1;
+    for(let i=0;i<10;i++){
+      ctx.beginPath();
+      ctx.moveTo((Date.now()/10 + i*160) % (W+200) - 200, H-GROUND_H + 18 + (i%3)*8);
+      ctx.lineTo((Date.now()/9 + i*160) % (W+200) + 80, H-GROUND_H + 18 + (i%3)*8);
+      ctx.stroke();
+    }
+  }
+
+  // Render loop draws all
+  function render(){
+    // clear
+    ctx.fillStyle = '#6ad'; ctx.fillRect(0,0,W,H);
+
+    drawBackground(ctx);
+
+    // draw lanes guide (subtle)
+    for(let i=0;i<LANE_COUNT;i++){
+      ctx.fillStyle = 'rgba(255,255,255,0.02)';
+      ctx.fillRect(LANE_X[i]-2, H-GROUND_H-220, 4, 220);
+    }
+
+    // draw obstacles
+    obstacles.forEach(o=>o.draw(ctx));
+    // draw powerups
+    powerups.forEach(p=>p.draw(ctx));
+    // draw coins
+    coinsArr.forEach(c=>c.draw(ctx));
+
+    // draw player
+    player.draw(ctx);
+
+    // draw UI overlays in canvas
+    // distance / meters
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = '600 14px system-ui';
+    ctx.fillText(`Meters: ${meters}`, 14, 32);
+
+    // power-up timers
+    let px = W - 160;
+    if(player.shield > 0){
+      ctx.fillStyle = '#59c0ff';
+      ctx.fillText(`Shield: ${player.shield.toFixed(1)}s`, px, 32); px += 110;
+    }
+    if(player.magnet > 0){
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText(`Magnet: ${player.magnet.toFixed(1)}s`, px, 32); px += 110;
+    }
+    if(player.speedBoost > 0){
+      ctx.fillStyle = '#ff7b7b';
+      ctx.fillText(`Boost: ${player.speedBoost.toFixed(1)}s`, px, 32); px += 110;
+    }
+  }
+
+  // End game logic and show scoreboard
+  function endGame(){
+    // persist highscore and coins
+    if(score > highscore){
+      highscore = score;
+      localStorage.setItem(LS.HIGHSCORE, String(highscore));
+    }
+    localStorage.setItem(LS.COINS, String(coins));
+    // Show overlay with results
+    showGameOver();
+  }
+
+  // UI: Build menus
+  function makePanel(html){
+    const p = document.createElement('div');
+    p.className = 'panel';
+    p.innerHTML = html;
+    return p;
+  }
+
+  // Show main menu
+  function showMainMenu(){
+    uiOverlay.innerHTML = '';
+    const html = `
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1">
+          <h1 class="center">Endless Runner</h1>
+          <p class="muted small center">Run as far as you can. Collect coins to unlock skins. Use power-ups to survive longer.</p>
+          <div class="row center" style="justify-content:center;">
+            <button id="playBtn" class="menu-btn">Play</button>
+            <button id="skinsBtn" class="secondary">Skins</button>
+            <button id="worldsBtn" class="secondary">Worlds</button>
+          </div>
+          <div style="display:flex;justify-content:center;margin-top:10px;">
+            <div class="muted small">Highscore: ${highscore} • Coins: ${coins}</div>
+          </div>
+        </div>
+        <div style="width:260px">
+          <div style="background:var(--panel);padding:10px;border-radius:8px">
+            <div class="small muted">Controls</div>
+            <div class="controls small">
+              <div>Jump: <b>Space / ↑ / Tap</b></div>
+              <div>Slide: <b>↓ / Swipe Down</b></div>
+              <div>Change Lane: <b>← → / Swipe</b></div>
+            </div>
+            <div class="footer">Skins: cosmetic only. Worlds change automatically while running every ${WORLD_CHANGE_DISTANCE} meters.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const p = makePanel(html);
+    uiOverlay.appendChild(p);
+
+    document.getElementById('playBtn').addEventListener('click', ()=>{
+      uiOverlay.innerHTML = '';
+      resetGame();
+      lastTime = performance.now();
+      requestAnimationFrame(update);
+      touchHint.style.display = isTouchDevice() ? 'block' : 'none';
+    });
+    document.getElementById('skinsBtn').addEventListener('click', ()=>{ showSkinsMenu(); SFX.ui(); });
+    document.getElementById('worldsBtn').addEventListener('click', ()=>{ showWorldsMenu(); SFX.ui(); });
+  }
+
+  // Skins menu
+  function showSkinsMenu(){
+    uiOverlay.innerHTML = '';
+    let skinsHtml = '<div class="skins">';
+    for(const s of SKINS){
+      const isUnlocked = unlockedSkins[s.id];
+      skinsHtml += `
+        <div class="skin-tile ${isUnlocked ? '' : 'locked'}" data-skin="${s.id}">
+          <div class="skin-preview" style="background:${s.color};width:64px;height:48px;border-radius:6px;border:2px solid rgba(0,0,0,0.12)"></div>
+          <div style="font-size:12px">${s.name}</div>
+          <div class="small muted">${isUnlocked ? 'Unlocked' : (s.costCoins ? `${s.costCoins} coins` : (s.costScore ? `${s.costScore} score` : 'Locked'))}</div>
+        </div>
+      `;
+    }
+    skinsHtml += '</div>';
+    const html = `
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1">
+          <h1>Skins</h1>
+          ${skinsHtml}
+          <div style="margin-top:10px;"><button id="backMain" class="secondary">Back</button></div>
+        </div>
+        <div style="width:260px">
+          <div style="background:var(--panel);padding:10px;border-radius:8px">
+            <div class="small muted">Selected: <b id="selectedSkinName">${selectedSkin}</b></div>
+            <div style="margin-top:8px;"><button id="equipBtn">Equip</button> <button id="unlockBtn" class="secondary">Unlock</button></div>
+            <div class="footer">Use coins to buy skins, or meet score thresholds.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const p = makePanel(html); uiOverlay.appendChild(p);
+
+    // click handlers
+    let active = selectedSkin;
+    const tiles = p.querySelectorAll('.skin-tile');
+    tiles.forEach(t=>{
+      t.addEventListener('click', ()=>{
+        tiles.forEach(tx=>tx.style.borderColor='transparent');
+        t.style.borderColor = '#fff';
+        active = t.getAttribute('data-skin');
+        p.querySelector('#selectedSkinName').textContent = active;
+      });
+    });
+
+    p.querySelector('#equipBtn').addEventListener('click', ()=>{
+      if(unlockedSkins[active]){
+        selectedSkin = active;
+        localStorage.setItem(LS.SELECTED_SKIN, selectedSkin);
+        player.skin = selectedSkin;
+        SFX.ui();
+      } else {
+        alert('Skin locked. Unlock it first.');
+      }
+    });
+    p.querySelector('#unlockBtn').addEventListener('click', ()=>{
+      const s = SKINS.find(ss=>ss.id===active);
+      if(!s) return;
+      if(unlockedSkins[active]) { alert('Already unlocked'); return; }
+      if(s.costCoins && coins >= s.costCoins){
+        coins -= s.costCoins; unlockedSkins[active]=true;
+        localStorage.setItem(LS.UNLOCKED, JSON.stringify(unlockedSkins));
+        localStorage.setItem(LS.COINS, String(coins));
+        SFX.coin();
+        showSkinsMenu(); // refresh
+      } else if(s.costScore && score >= s.costScore){
+        unlockedSkins[active]=true; localStorage.setItem(LS.UNLOCKED, JSON.stringify(unlockedSkins));
+        SFX.coin(); showSkinsMenu();
+      } else {
+        alert('Not enough coins/score to unlock this skin.');
+      }
+    });
+    p.querySelector('#backMain').addEventListener('click', ()=>{ showMainMenu(); SFX.ui(); });
+  }
+
+  // Worlds menu
+  function showWorldsMenu(){
+    uiOverlay.innerHTML = '';
+    const html = `
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1">
+          <h1>Worlds</h1>
+          <div class="row" style="flex-wrap:wrap;">
+            ${WORLDS.map((w,i)=>`
+              <div style="width:200px;background:${w.bgBottom};padding:12px;border-radius:8px;color:#fff">
+                <div style="font-weight:700">${w.name}</div>
+                <div class="small muted" style="color:rgba(255,255,255,0.85)">${w.deco.join(', ')}</div>
+                <div style="margin-top:8px;"><button class="secondary select-world" data-index="${i}">Select</button></div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top:10px;"><button id="backMain2" class="secondary">Back</button></div>
+        </div>
+        <div style="width:260px">
+          <div style="background:var(--panel);padding:10px;border-radius:8px">
+            <div class="small muted">Worlds change automatically while running, but you can pick a starting world here.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const p = makePanel(html); uiOverlay.appendChild(p);
+    p.querySelectorAll('.select-world').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = parseInt(btn.getAttribute('data-index'));
+        worldIndex = idx; world = WORLDS[worldIndex];
+        showMainMenu(); SFX.ui();
+      });
+    });
+    p.querySelector('#backMain2').addEventListener('click', ()=>{ showMainMenu(); SFX.ui(); });
+  }
+
+  // Game over screen
+  function showGameOver(){
+    uiOverlay.innerHTML = '';
+    const better = score >= highscore ? ' (New Highscore!)' : '';
+    const html = `
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1">
+          <h1>Game Over</h1>
+          <div style="font-size:20px;font-weight:800">${score}${better}</div>
+          <div class="muted small">Meters: ${meters} • Coins: ${coins}</div>
+          <div style="margin-top:12px;">
+            <button id="retryBtn">Retry</button>
+            <button id="menuBtn" class="secondary">Main Menu</button>
+          </div>
+        </div>
+        <div style="width:260px">
+          <div style="background:var(--panel);padding:12px;border-radius:8px">
+            <div style="font-weight:700">Best: ${highscore}</div>
+            <div class="muted small">Select skins, change worlds, and try again.</div>
+          </div>
+        </div>
+      </div>
+    `;
+    const p = makePanel(html); uiOverlay.appendChild(p);
+
+    document.getElementById('retryBtn').addEventListener('click', ()=>{
+      uiOverlay.innerHTML = '';
+      resetGame();
+      lastTime = performance.now();
+      requestAnimationFrame(update);
+    });
+    document.getElementById('menuBtn').addEventListener('click', ()=>{ showMainMenu(); });
+  }
+
+  // Input handling
+  function onKeyDown(e){
+    if(!running) return;
+    if(e.code==='Space' || e.code==='ArrowUp'){ e.preventDefault(); player.jump(); }
+    if(e.code==='ArrowDown'){ e.preventDefault(); player.doSlide(); }
+    if(e.code==='ArrowLeft'){ e.preventDefault(); player.changeLane(-1); }
+    if(e.code==='ArrowRight'){ e.preventDefault(); player.changeLane(1); }
+    if(e.code==='KeyP'){ paused = !paused; if(paused) cancelAnimationFrame(update); else { lastTime = performance.now(); requestAnimationFrame(update); } }
+  }
+
+  // Touch handling: simple tap & swipe detection
+  let touchState = {startX:0,startY:0,startTime:0,active:false};
+  function isTouchDevice(){ return 'ontouchstart' in window || navigator.maxTouchPoints>0; }
+  function onTouchStart(e){
+    if(!running) return;
+    const t = e.touches ? e.touches[0] : e;
+    touchState.startX = t.clientX; touchState.startY = t.clientY; touchState.startTime = Date.now(); touchState.active = true;
+  }
+  function onTouchEnd(e){
+    if(!running || !touchState.active) return;
+    const t = (e.changedTouches && e.changedTouches[0]) || e;
+    const dx = t.clientX - touchState.startX;
+    const dy = t.clientY - touchState.startY;
+    const dt = Date.now() - touchState.startTime;
+    touchState.active = false;
+
+    // threshold
+    const minSwipe = 40;
+    if(Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 400){
+      // tap
+      player.jump();
+    } else if(Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipe){
+      // horizontal swipe
+      if(dx > 0) player.changeLane(1); else player.changeLane(-1);
+    } else if(Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > minSwipe){
+      if(dy > 0) player.doSlide(); else player.jump();
+    }
+  }
+
+  // Resize handling
+  function fitCanvas(){
+    const ratio = canvas.width / canvas.height;
+    const maxW = Math.min(window.innerWidth - 40, 1160);
+    const sizeW = Math.min(maxW, window.innerWidth - 40);
+    const sizeH = Math.round(sizeW / ratio);
+    canvas.style.width = sizeW + 'px';
+    canvas.style.height = sizeH + 'px';
+    // recompute lanes in internal coordinate
+    W = canvas.width; H = canvas.height;
+    computeLanes();
+  }
+  window.addEventListener('resize', fitCanvas);
+
+  // Setup input listeners
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('touchstart', onTouchStart, {passive:true});
+  window.addEventListener('touchend', onTouchEnd, {passive:true});
+  window.addEventListener('mousedown', (e)=>{ if(isTouchDevice()) return; onTouchStart(e); });
+  window.addEventListener('mouseup', (e)=>{ if(isTouchDevice()) return; onTouchEnd(e); });
+
+  // Initialize
+  computeLanes();
+  showMainMenu();
+  fitCanvas();
+
+  // Friendly note: unlock default skin if not set
+  if(!unlockedSkins['default']) { unlockedSkins['default']=true; localStorage.setItem(LS.UNLOCKED, JSON.stringify(unlockedSkins)); }
+
+  // expose for debugging (optional)
+  window.ER = {player, SKINS, unlockedSkins, coins, resetGame, showMainMenu};
+})();
+</script>
+</body>
+</html>
