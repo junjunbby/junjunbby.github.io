@@ -2,157 +2,202 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Mini-Maze Deluxe</title>
+<title>Mini-Maze Deluxe 3D</title>
 <style>
 body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-family: sans-serif;
-  background: #f0f0f0;
-  margin:0;
-  padding:0;
+  margin:0; padding:0;
+  font-family:sans-serif;
+  background:#e0e0e0;
+  display:flex; flex-direction:column; align-items:center;
 }
 
-h1 { margin-top: 20px; }
+h1 { margin-top:20px; }
 
+/* UI Panel */
+#concept {
+  width: 90%;
+  max-width:400px;
+  background: #fff;
+  border-radius: 10px;
+  padding:20px;
+  margin:20px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  text-align:center;
+  position:relative;
+  z-index:10;
+}
+#concept button {
+  margin-top:10px;
+  padding:10px 20px;
+  font-size:16px;
+  cursor:pointer;
+}
+
+/* Maze container 3D */
 #maze {
-  display: grid;
-  grid-template-columns: repeat(5, 40px);
-  grid-template-rows: repeat(5, 40px);
-  gap: 2px;
-  margin-top: 20px;
-  touch-action: none;
-  transition: background-color 0.5s ease;
+  display:grid;
+  grid-template-columns: repeat(5, 50px);
+  grid-template-rows: repeat(5, 50px);
+  gap:2px;
+  perspective:600px; /* 3D perspective */
+  margin-bottom:20px;
 }
 
 .cell {
-  width: 40px;
-  height: 40px;
-  background: #fff;
-  border: 1px solid #ccc;
+  width:50px; height:50px;
+  background:#fff;
+  border:1px solid #ccc;
+  box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+  transform-style: preserve-3d;
+  transition: transform 0.15s ease, background-color 0.3s;
 }
 
-.wall { background: #333; }
-.player { background: #ff5555; border-radius:50%; transition: transform 0.15s ease; }
-.exit { background: #55ff55; }
-.star { background: #ffdd55; animation: blink 1s infinite; }
-.trap { background: #5555ff; }
+.wall { background:#333; transform:translateZ(5px); }
+.exit { background:#55ff55; transform:translateZ(5px); }
+.star { background:#ffdd55; animation:blink 1s infinite; transform:translateZ(10px); }
+.trap { background:#5555ff; transform:translateZ(-2px); }
+
+.player {
+  background:#ff5555; border-radius:10px;
+  transform: translateZ(12px);
+  transition: transform 0.15s ease;
+}
 
 @keyframes blink {
   0%,100% { opacity:1; }
   50% { opacity:0.5; }
 }
 
-@keyframes shake {
-  0% { transform: translate(0,0) rotate(0deg); }
-  25% { transform: translate(var(--x), var(--y)) rotate(var(--r)); }
-  75% { transform: translate(calc(var(--x) * -1), calc(var(--y) * -1)) rotate(calc(var(--r) * -1)); }
-  100% { transform: translate(0,0) rotate(0deg); }
+#info {
+  font-size:18px;
+  margin-bottom:10px;
 }
 
-#maze.shake { animation: shake 0.15s ease; }
+/* Shake animation */
+@keyframes shake {
+  0% { transform: rotateX(0) rotateY(0) translate(0,0); }
+  25% { transform: rotateX(var(--ry)) rotateY(var(--rx)) translate(var(--x), var(--y)); }
+  75% { transform: rotateX(calc(var(--ry)*-1)) rotateY(calc(var(--rx)*-1)) translate(calc(var(--x)*-1), calc(var(--y)*-1)); }
+  100% { transform: rotateX(0) rotateY(0) translate(0,0); }
+}
+#maze.shake {
+  animation: shake 0.15s ease;
+}
 
-#info { margin-top: 20px; font-size: 18px; }
 </style>
 </head>
 <body>
-<h1>Mini-Maze Deluxe</h1>
 
-<div id="info">Level: 1 | Zeit: 30 | Punkte: 0 | Highscore: 0</div>
+<h1>Mini-Maze Deluxe 3D</h1>
+
+<div id="concept">
+  <h2>How to Play</h2>
+  <p>Navigate the red cube (player) through the maze.<br>
+  Collect yellow stars for points.<br>
+  Avoid blue traps—they reduce your time.<br>
+  Reach the green exit to advance levels.</p>
+  <p>Controls: Arrow keys or swipe on mobile</p>
+  <button onclick="startGame()">Start Game</button>
+</div>
+
+<div id="info">Level: 1 | Time: 30 | Score: 0 | Highscore: 0</div>
 <div id="maze"></div>
-
-<!-- Sounds -->
-<audio id="moveSound" src="https://freesound.org/data/previews/256/256113_3263906-lq.mp3"></audio>
-<audio id="starSound" src="https://freesound.org/data/previews/320/320655_5260876-lq.mp3"></audio>
-<audio id="trapSound" src="https://freesound.org/data/previews/198/198841_2859976-lq.mp3"></audio>
-<audio id="levelSound" src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3"></audio>
 
 <script>
 let level=1, gridSize=5, maze=[], playerPos={x:0,y:0}, exitPos={x:4,y:4}, stars=[], traps=[];
-let timer=30, score=0, highscore=localStorage.getItem('miniMazeHighscore') || 0;
+let timer=30, score=0, highscore=localStorage.getItem('miniMazeHighscore')||0;
 let interval;
 
-// Maze erstellen
-function createMaze(){
-  const mazeContainer = document.getElementById('maze');
-  mazeContainer.innerHTML='';
-  mazeContainer.style.gridTemplateColumns = `repeat(${gridSize},40px)`;
-  maze=[]; stars=[]; traps=[];
+// Hide concept panel and start
+function startGame(){
+  document.getElementById('concept').style.display='none';
+  createMaze(); startTimer();
+}
 
+// Maze creation
+function createMaze(){
+  const mazeContainer=document.getElementById('maze');
+  mazeContainer.innerHTML='';
+  mazeContainer.style.gridTemplateColumns=`repeat(${gridSize},50px)`;
+  maze=[]; stars=[]; traps=[];
   for(let y=0;y<gridSize;y++){
     maze[y]=[];
     for(let x=0;x<gridSize;x++){
-      const cell = document.createElement('div'); cell.classList.add('cell');
-
-      if(Math.random()<0.2 && !(x===0&&y===0) && !(x===gridSize-1&&y===gridSize-1)){
-        cell.classList.add('wall'); maze[y][x]='wall';
-      } else if(Math.random()<0.05){
-        cell.classList.add('trap'); maze[y][x]='trap'; traps.push({x,y});
-      } else if(Math.random()<0.1){
-        cell.classList.add('star'); maze[y][x]='star'; stars.push({x,y});
-      } else { maze[y][x]='path'; }
-
+      const cell=document.createElement('div'); cell.classList.add('cell');
+      if(Math.random()<0.2 && !(x===0&&y===0) && !(x===gridSize-1&&y===gridSize-1)){ cell.classList.add('wall'); maze[y][x]='wall'; }
+      else if(Math.random()<0.05){ cell.classList.add('trap'); maze[y][x]='trap'; traps.push({x,y}); }
+      else if(Math.random()<0.1){ cell.classList.add('star'); maze[y][x]='star'; stars.push({x,y}); }
+      else{ maze[y][x]='path'; }
       mazeContainer.appendChild(cell);
     }
   }
-
   playerPos={x:0,y:0}; exitPos={x:gridSize-1,y:gridSize-1};
   mazeContainer.children[playerPos.y*gridSize+playerPos.x].classList.add('player');
   mazeContainer.children[exitPos.y*gridSize+exitPos.x].classList.add('exit');
   updateInfo();
 }
 
-// Info
-function updateInfo(){ document.getElementById('info').textContent=`Level: ${level} | Zeit: ${timer} | Punkte: ${score} | Highscore: ${highscore}`; }
+function updateInfo(){ document.getElementById('info').textContent=`Level: ${level} | Time: ${timer} | Score: ${score} | Highscore: ${highscore}`; }
 
-// Sound & Vibration
-function playSound(id){ const audio=document.getElementById(id); if(audio){ audio.currentTime=0; audio.play(); } }
-function vibrate(d){ if(navigator.vibrate) navigator.vibrate(d); }
-
-// Bewegung
-function move(dx,dy){
-  let nx=playerPos.x+dx, ny=playerPos.y+dy;
-  if(nx>=0 && ny>=0 && nx<gridSize && ny<gridSize){
-    const cellType = maze[ny][nx];
-    if(cellType!=='wall'){
-      playerPos={x:nx,y:ny};
-      playSound('moveSound'); vibrate(50);
-
-      if(cellType==='star'){ score+=10; maze[ny][nx]='path'; stars=stars.filter(s=>!(s.x===nx&&s.y===ny)); playSound('starSound'); vibrate(100); }
-      if(cellType==='trap'){ timer=Math.max(1,timer-5); maze[ny][nx]='path'; playSound('trapSound'); vibrate(300); }
-
-      updatePlayer(); checkExit(); updateInfo();
-
-      const playerDiv=document.getElementById('maze').children[playerPos.y*gridSize+playerPos.x];
-      playerDiv.style.transform=`scale(1.2) rotate(${dx*15}deg)`;
-      setTimeout(()=>playerDiv.style.transform='scale(1) rotate(0deg)',150);
-
-      const mazeDiv=document.getElementById('maze');
-      let xShift=dx*5+'px', yShift=dy*5+'px', rShift=dx*5+'deg';
-      mazeDiv.style.setProperty('--x',xShift); mazeDiv.style.setProperty('--y',yShift); mazeDiv.style.setProperty('--r',rShift);
-      mazeDiv.classList.add('shake'); setTimeout(()=>mazeDiv.classList.remove('shake'),150);
-      mazeDiv.style.backgroundColor=`hsl(${level*20%360},20%,95%)`;
-    }
-  }
-}
-
-// Spieler Update
+// Player update
 function updatePlayer(){
   const cells=document.getElementById('maze').children;
   for(let i=0;i<cells.length;i++) cells[i].classList.remove('player');
   cells[playerPos.y*gridSize+playerPos.x].classList.add('player');
 }
 
-// Exit Check
+// Movement
+function move(dx,dy){
+  let nx=playerPos.x+dx, ny=playerPos.y+dy;
+  if(nx>=0 && ny>=0 && nx<gridSize && ny<gridSize){
+    const cellType=maze[ny][nx];
+    if(cellType!=='wall'){
+      playerPos={x:nx,y:ny};
+      updatePlayer();
+
+      // Stars
+      if(cellType==='star'){ score+=10; maze[ny][nx]='path'; stars=stars.filter(s=>!(s.x===nx&&s.y===ny)); }
+
+      // Traps
+      if(cellType==='trap'){ timer=Math.max(1,timer-5); maze[ny][nx]='path'; }
+
+      // Player pop + wobble
+      const playerDiv=document.getElementById('maze').children[playerPos.y*gridSize+playerPos.x];
+      playerDiv.style.transform=`translateZ(12px) scale(1.2) rotateY(${dx*15}deg) rotateX(${dy*10}deg)`;
+      setTimeout(()=>playerDiv.style.transform='translateZ(12px) scale(1) rotateY(0deg) rotateX(0deg)',150);
+
+      // Maze shake
+      const mazeDiv=document.getElementById('maze');
+      mazeDiv.style.setProperty('--x', dx*5+'px'); mazeDiv.style.setProperty('--y', dy*5+'px');
+      mazeDiv.style.setProperty('--rx', dx*5+'deg'); mazeDiv.style.setProperty('--ry', dy*5+'deg');
+      mazeDiv.classList.add('shake'); setTimeout(()=>mazeDiv.classList.remove('shake'),150);
+
+      // Background pulse
+      mazeDiv.style.backgroundColor=`hsl(${level*20%360},20%,95%)`;
+
+      checkExit();
+      updateInfo();
+    }
+  }
+}
+
+// Exit
 function checkExit(){
   if(playerPos.x===exitPos.x && playerPos.y===exitPos.y){
-    playSound('levelSound'); vibrate(200);
     level++; gridSize=Math.min(gridSize+1,10); timer=30; createMaze();
   }
 }
 
-// Tastatur
+// Timer
+function startTimer(){
+  clearInterval(interval);
+  interval=setInterval(()=>{
+    timer--; if(timer<=0){ level=1; gridSize=5; timer=30; score=0; createMaze(); }
+    updateInfo();
+  },1000);
+}
+
+// Keyboard
 document.addEventListener('keydown',e=>{
   if(e.key==='ArrowUp') move(0,-1);
   else if(e.key==='ArrowDown') move(0,1);
@@ -160,20 +205,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowRight') move(1,0);
 });
 
-// Timer
-function startTimer(){
-  clearInterval(interval);
-  interval=setInterval(()=>{
-    timer--; if(timer<=0){
-      alert('Zeit abgelaufen! Spiel endet.');
-      if(score>highscore){ highscore=score; localStorage.setItem('miniMazeHighscore',highscore); alert('Neuer Highscore: '+highscore); }
-      level=1; gridSize=5; timer=30; score=0; createMaze();
-    }
-    updateInfo();
-  },1000);
-}
-
-// Touchsteuerung
+// Touch
 let touchStart=null;
 document.getElementById('maze').addEventListener('touchstart',e=>{ touchStart=e.touches[0]; });
 document.getElementById('maze').addEventListener('touchend',e=>{
@@ -181,12 +213,11 @@ document.getElementById('maze').addEventListener('touchend',e=>{
   let touchEnd=e.changedTouches[0];
   let dx=touchEnd.clientX-touchStart.clientX;
   let dy=touchEnd.clientY-touchStart.clientY;
-  if(Math.abs(dx)>Math.abs(dy)){ dx>0?move(1,0):move(-1,0); } 
-  else { dy>0?move(0,1):move(0,-1); }
+  if(Math.abs(dx)>Math.abs(dy)){ dx>0?move(1,0):move(-1,0); }
+  else{ dy>0?move(0,1):move(0,-1); }
   touchStart=null;
 });
-
-createMaze(); startTimer();
 </script>
 </body>
 </html>
+
