@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Mini-Maze 2.5D Arcade</title>
+<title>Mini-Maze 2.5D Arcade Fixed</title>
 <style>
 body { margin:0; overflow:hidden; font-family:sans-serif; touch-action: none; background:#222; }
 #ui {
@@ -16,7 +16,7 @@ body { margin:0; overflow:hidden; font-family:sans-serif; touch-action: none; ba
 </head>
 <body>
 <div id="ui">
-  <h3>Mini-Maze 2.5D Arcade</h3>
+  <h3>Mini-Maze 2.5D Arcade Fixed</h3>
   <p>Arrow keys / WASD / swipe: move</p>
   <p id="status">Level: 1 | Score: 0 | Time: 30 | Highscore: 0</p>
 </div>
@@ -25,14 +25,15 @@ body { margin:0; overflow:hidden; font-family:sans-serif; touch-action: none; ba
 <audio id="starSound" src="https://freesound.org/data/previews/320/320655_5260876-lq.mp3"></audio>
 <audio id="trapSound" src="https://freesound.org/data/previews/198/198841_2859976-lq.mp3"></audio>
 <audio id="exitSound" src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3"></audio>
+<audio id="levelUpSound" src="https://freesound.org/data/previews/146/146725_2615114-lq.mp3"></audio> <!-- New level-up sound -->
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script>
 let scene, camera, renderer;
 let gridSize=5, cellSize=4, level=1, score=0, timer=30, highscore=localStorage.getItem('miniMazeHighscore')||0;
-let maze=[], stars=[], traps=[], particlesGroup=[];
-let playerPos={x:0,y:0}, playerMesh, exitMesh;
+let mazeMap=[], stars=[], traps=[], particlesGroup=[];
+let playerPos={x:0,y:0}, playerMesh, exitPos={x:0,y:0};
 let interval, touchStart=null;
 
 init(); animate(); startTimer();
@@ -42,7 +43,6 @@ function playSound(id){ const audio=document.getElementById(id); if(audio){ audi
 function init(){
   scene = new THREE.Scene(); scene.background = new THREE.Color(0x222222);
 
-  // 2.5D Camera (top-down angle)
   camera = new THREE.PerspectiveCamera(50,window.innerWidth/window.innerHeight,0.1,1000);
   camera.position.set(gridSize*cellSize/2, gridSize*cellSize*1.8, gridSize*cellSize/1.5);
   camera.lookAt(gridSize*cellSize/2,0,gridSize*cellSize/2);
@@ -53,75 +53,82 @@ function init(){
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
 
-  // Lights
   const dirLight = new THREE.DirectionalLight(0xffffff,1);
   dirLight.position.set(10,50,10);
   dirLight.castShadow=true;
   scene.add(dirLight);
   scene.add(new THREE.AmbientLight(0xffffff,0.5));
 
-  // Floor
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(gridSize*cellSize, gridSize*cellSize),
       new THREE.MeshStandardMaterial({color:0x333333, metalness:0.5, roughness:0.3}));
   floor.rotation.x=-Math.PI/2;
   floor.receiveShadow = true;
   scene.add(floor);
 
-  createMaze(); createPlayer(); createExit();
+  generateMaze(); createPlayer(); updateStatus();
 
   window.addEventListener('keydown',handleKey);
-  window.addEventListener('touchstart',e=>{ touchStart = e.touches[0]; });
+  window.addEventListener('touchstart',e=>{ touchStart=e.touches[0]; });
   window.addEventListener('touchend',handleSwipe);
 }
 
-// Maze, Player, Exit
-function createMaze(){
-  for(let obj of maze) scene.remove(obj); maze=[];
-  for(let s of stars) scene.remove(s.mesh); stars=[];
-  for(let t of traps) scene.remove(t.mesh); traps=[];
+// --- Maze Generation ---
+function generateMaze(){
+  mazeMap=Array(gridSize).fill(0).map(()=>Array(gridSize).fill(0));
+  stars=[]; traps=[];
+
+  // Remove previous objects
+  scene.children = scene.children.filter(c => c.type!=="Mesh" || c.geometry.type==="PlaneGeometry");
 
   for(let y=0;y<gridSize;y++){
     for(let x=0;x<gridSize;x++){
-      let cellType='path';
-      if(Math.random()<0.2 && !(x===0&&y===0) && !(x===gridSize-1&&y===gridSize-1)) cellType='wall';
-      else if(Math.random()<0.05) cellType='trap';
-      else if(Math.random()<0.1) cellType='star';
+      if(x===0 && y===0){ mazeMap[y][x]=0; continue; }
+      if(x===gridSize-1 && y===gridSize-1){ mazeMap[y][x]=4; exitPos={x,y}; continue; }
 
-      if(cellType==='wall'){
-        const cube = new THREE.Mesh(new THREE.BoxGeometry(cellSize,cellSize*0.7,cellSize),
-          new THREE.MeshStandardMaterial({color:0x555555}));
-        cube.position.set(x*cellSize+cellSize/2,cellSize*0.35,y*cellSize+cellSize/2);
-        cube.castShadow=true; scene.add(cube); maze.push(cube);
-      } else if(cellType==='star'){
-        const star = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/2,cellSize/2),
-          new THREE.MeshStandardMaterial({color:0xffff00}));
-        star.position.set(x*cellSize+cellSize/2,cellSize/4,y*cellSize+cellSize/2);
-        star.castShadow=true; scene.add(star); stars.push({mesh:star,x,y});
-      } else if(cellType==='trap'){
-        const trap = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/4,cellSize/2),
-          new THREE.MeshStandardMaterial({color:0x5555ff, emissive:0x0000ff, emissiveIntensity:0.3}));
-        trap.position.set(x*cellSize+cellSize/2,cellSize/8,y*cellSize+cellSize/2);
-        trap.castShadow=true; scene.add(trap); traps.push({mesh:trap,x,y});
-      }
+      const rand=Math.random();
+      if(rand<0.2){ mazeMap[y][x]=1; createWall(x,y); }
+      else if(rand<0.3){ mazeMap[y][x]=2; createStar(x,y); }
+      else if(rand<0.35){ mazeMap[y][x]=3; createTrap(x,y); }
+      else mazeMap[y][x]=0;
     }
   }
 }
 
+function createWall(x,y){
+  const cube = new THREE.Mesh(new THREE.BoxGeometry(cellSize,cellSize*0.7,cellSize),
+    new THREE.MeshStandardMaterial({color:0x555555}));
+  cube.position.set(x*cellSize+cellSize/2,cellSize*0.35,y*cellSize+cellSize/2);
+  cube.castShadow=true; scene.add(cube);
+}
+
+function createStar(x,y){
+  const star = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/2,cellSize/2),
+    new THREE.MeshStandardMaterial({color:0xffff00}));
+  star.position.set(x*cellSize+cellSize/2,cellSize/4,y*cellSize+cellSize/2);
+  star.castShadow=true; scene.add(star);
+  stars.push({x,y,mesh:star});
+}
+
+function createTrap(x,y){
+  const trap = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/4,cellSize/2),
+    new THREE.MeshStandardMaterial({color:0x5555ff, emissive:0x0000ff, emissiveIntensity:0.3}));
+  trap.position.set(x*cellSize+cellSize/2,cellSize/8,y*cellSize+cellSize/2);
+  trap.castShadow=true; scene.add(trap);
+  traps.push({x,y,mesh:trap});
+}
+
+// --- Player ---
 function createPlayer(){
+  if(playerMesh) scene.remove(playerMesh);
   const geom = new THREE.BoxGeometry(cellSize*0.8,cellSize*0.8,cellSize*0.8);
   const mat = new THREE.MeshStandardMaterial({color:0xff5555});
-  playerMesh = new THREE.Mesh(geom,mat); playerMesh.position.set(cellSize/2,cellSize/2,cellSize/2);
-  playerMesh.castShadow=true; scene.add(playerMesh);
+  playerMesh = new THREE.Mesh(geom,mat);
+  playerMesh.position.set(playerPos.x*cellSize+cellSize/2,cellSize/2,playerPos.y*cellSize+cellSize/2);
+  playerMesh.castShadow=true;
+  scene.add(playerMesh);
 }
 
-function createExit(){
-  const geom = new THREE.BoxGeometry(cellSize,cellSize,cellSize);
-  const mat = new THREE.MeshStandardMaterial({color:0x55ff55});
-  exitMesh = new THREE.Mesh(geom,mat); exitMesh.position.set((gridSize-1)*cellSize+cellSize/2,cellSize/2,(gridSize-1)*cellSize+cellSize/2);
-  exitMesh.castShadow=true; scene.add(exitMesh);
-}
-
-// Controls
+// --- Controls ---
 function handleKey(e){ let dx=0,dy=0;
   if(e.key==='ArrowUp'||e.key==='w'||e.key==='W') dy=-1;
   else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S') dy=1;
@@ -137,40 +144,18 @@ function handleSwipe(e){
   const dy = touchEnd.clientY - touchStart.clientY;
   if(Math.abs(dx)>Math.abs(dy)){ dx>0?movePlayer(1,0):movePlayer(-1,0); } 
   else { dy>0?movePlayer(0,1):movePlayer(0,-1); }
-  touchStart = null;
+  touchStart=null;
 }
 
-// Particles
-function spawnParticles(x,y,z,color=0xffff00){
-  const geom = new THREE.BufferGeometry();
-  const vertices=[]; for(let i=0;i<30;i++) vertices.push(x,y,z);
-  geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices,3));
-  const mat = new THREE.PointsMaterial({color,size:0.3});
-  const points = new THREE.Points(geom,mat); scene.add(points);
-  particlesGroup.push({points, life:30});
-}
+// --- Movement & Collisions ---
+function canMove(nx,ny){ return nx>=0 && ny>=0 && nx<gridSize && ny<gridSize && mazeMap[ny][nx]!==1; }
 
-// Camera shake
-function shakeCamera(intensity=0.2, duration=0.15){
-  const orig = camera.position.clone();
-  gsap.to(camera.position,{
-    duration:duration,
-    x: orig.x + (Math.random()-0.5)*intensity,
-    y: orig.y + (Math.random()-0.5)*intensity,
-    z: orig.z + (Math.random()-0.5)*intensity,
-    yoyo:true, repeat:1,
-    onComplete:()=>{ camera.position.copy(orig); }
-  });
-}
-
-// Move Player
 function movePlayer(dx,dy){
   const nx=playerPos.x+dx, ny=playerPos.y+dy;
-  if(nx<0||ny<0||nx>=gridSize||ny>=gridSize) return;
-  for(let w of maze) if(Math.round(w.position.x/cellSize)-0.5===nx && Math.round(w.position.z/cellSize)-0.5===ny) return;
-
+  if(!canMove(nx,ny)) return;
   playerPos.x=nx; playerPos.y=ny;
-  gsap.to(playerMesh.position,{duration:0.15, x:nx*cellSize+cellSize/2, z:ny*cellSize+cellSize/2});
+
+  gsap.to(playerMesh.position,{duration:0.15, x:nx*cellSize+cellSize/2, z=ny*cellSize+cellSize/2});
   gsap.to(scene.rotation,{duration:0.12, x:dy*0.04, z:-dx*0.04, yoyo:true, repeat:1});
 
   // Stars
@@ -187,18 +172,38 @@ function movePlayer(dx,dy){
   for(let t of traps){ if(t.x===nx && t.y===ny){ shakeCamera(0.2,0.15); playSound('trapSound'); timer=Math.max(1,timer-5); updateStatus(); } }
 
   // Exit
-  if(nx===gridSize-1 && ny===gridSize-1){
-    spawnParticles(exitMesh.position.x,exitMesh.position.y,exitMesh.position.z,0x00ff00);
+  if(nx===exitPos.x && ny===exitPos.y){
+    spawnParticles(playerMesh.position.x,playerMesh.position.y,playerMesh.position.z,0x00ff00);
     shakeCamera(0.25,0.2);
-    playSound('exitSound');
+    playSound('levelUpSound'); // NEW sound for next level
     level++; gridSize=Math.min(gridSize+1,10); playerPos={x:0,y:0};
-    // Level transition animation
-    gsap.to(scene.rotation,{duration:0.8, y:Math.PI*2, ease:"power2.inOut"});
-    createMaze(); createPlayer(); createExit(); updateStatus();
+    generateMaze(); createPlayer(); updateStatus();
   }
 }
 
-// UI / Timer
+// --- Particles & Camera Shake ---
+function spawnParticles(x,y,z,color=0xffff00){
+  const geom = new THREE.BufferGeometry();
+  const vertices=[]; for(let i=0;i<30;i++) vertices.push(x,y,z);
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices,3));
+  const mat = new THREE.PointsMaterial({color,size:0.3});
+  const points = new THREE.Points(geom,mat); scene.add(points);
+  particlesGroup.push({points,life:30});
+}
+
+function shakeCamera(intensity=0.2,duration=0.15){
+  const orig = camera.position.clone();
+  gsap.to(camera.position,{
+    duration:duration,
+    x: orig.x + (Math.random()-0.5)*intensity,
+    y: orig.y + (Math.random()-0.5)*intensity,
+    z: orig.z + (Math.random()-0.5)*intensity,
+    yoyo:true, repeat:1,
+    onComplete:()=>{ camera.position.copy(orig); }
+  });
+}
+
+// --- UI / Timer ---
 function updateStatus(){
   document.getElementById('status').textContent=
     `Level: ${level} | Score: ${score} | Time: ${timer} | Highscore: ${highscore}`;
@@ -211,22 +216,22 @@ function startTimer(){
     timer--; if(timer<=0){
       alert('Time up!');
       if(score>highscore){ highscore=score; localStorage.setItem('miniMazeHighscore',highscore); alert('New Highscore: '+highscore);}
-      level=1; gridSize=5; score=0; timer=30; createMaze(); createPlayer(); createExit(); updateStatus();
+      level=1; gridSize=5; score=0; timer=30; generateMaze(); createPlayer(); updateStatus();
     }
     updateStatus();
   },1000);
 }
 
-// Animate
+// --- Animate ---
 function animate(){
   requestAnimationFrame(animate);
+
   for(let s of stars) s.mesh.rotation.y+=0.02;
   for(let t of traps) t.mesh.material.emissiveIntensity=0.3+0.2*Math.sin(Date.now()*0.01);
 
   gsap.to(camera.position,{duration:0.15, x:playerMesh.position.x + gridSize, z:playerMesh.position.z + gridSize});
   camera.lookAt(playerMesh.position);
 
-  // Animate particles
   for(let i=particlesGroup.length-1;i>=0;i--){
     const p=particlesGroup[i]; const pos=p.points.geometry.attributes.position.array;
     for(let j=0;j<pos.length;j+=3){
