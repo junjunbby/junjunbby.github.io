@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Mini FPS MVP — Browser (WebGL) — Patched</title>
+<title>Mini FPS MVP — Browser (WebGL) — Teleport on Start</title>
 <style>
   :root{
     --bg:#0b0f14;
@@ -65,7 +65,7 @@
   <div id="minimap"></div>
 
   <div id="menu" style="display:flex;flex-direction:column;gap:8px">
-    <button id="startBtn">Start (request pointer lock)</button>
+    <button id="startBtn">Start (teleport to arena + request pointer lock)</button>
     <button id="toggleDebugBtn" class="secondary">Toggle Debug</button>
     <button id="addBotBtn" class="secondary">+ Bot</button>
   </div>
@@ -73,10 +73,11 @@
 
 <script>
 /*
-Patched Mini FPS MVP
-- Adds pointer-lock indicator and a mousemove fallback: pointer-lock preferred, fallback free-look while holding left mouse button.
-- Start button requests pointer lock and focuses canvas as fallback.
-- Otherwise same compact MVP.
+Patched Mini FPS MVP — Teleport on Start
+- When Start is pressed, the player is teleported to a spawn point in the arena
+  (random spawn chosen), velocity/yaw/pitch reset, pointer-lock requested.
+- Fallback free-look while holding left mouse button remains.
+- Same compact MVP features otherwise.
 */
 
 /* -------------------- Utilities (vec/mat small lib) -------------------- */
@@ -215,7 +216,7 @@ const cubeVerts = new Float32Array([
    0.5,-0.5,-0.5,     1,0,0,
    0.5, 0.5,-0.5,     1,0,0,
    0.5, 0.5, 0.5,     1,0,0,
-   0.5,-0.5, 0.5,     1,0,0,
+   0.5,-0.5  ,0.5,    1,0,0,
   -0.5,-0.5,-0.5,     0,-1,0,
   -0.5,-0.5, 0.5,     0,-1,0,
    0.5,-0.5, 0.5,     0,-1,0,
@@ -243,11 +244,9 @@ gl.enable(gl.DEPTH_TEST);
 gl.clearColor(0.06,0.08,0.10,1);
 
 /* -------------------- Simple scene definition -------------------- */
-/* Map: floor plane + room of boxes (AABB obstacles) */
 const MAP = {
-  bounds: { x:-20, z:-30, w:40, d:60 }, // x,z plane extents
+  bounds: { x:-20, z:-30, w:40, d:60 },
   obstacles: [
-    // Each obstacle is {x,z,w,d,h,color}
     {x: -6, z: -4, w: 4, d: 8, h: 2.6, color:[0.6,0.6,0.6]},
     {x: 6, z: 6, w: 6, d: 4, h: 2.6, color:[0.5,0.4,0.4]},
     {x: 0, z: 14, w: 12, d: 6, h: 2.6, color:[0.35,0.6,0.45]},
@@ -261,12 +260,12 @@ const MAP = {
 
 /* -------------------- Player state & controller -------------------- */
 const Player = {
-  pos: new Vec3(0, 0, -8),   // x,y,z (y used for vertical eye height)
+  pos: new Vec3(0, 0, -8),
   vel: new Vec3(0,0,0),
   yaw: 0, pitch: 0,
-  eyeHeight: 1.6,            // meters
-  radius: 0.35,              // collision cylinder radius
-  speed: 5.4,                // walk m/s
+  eyeHeight: 1.6,
+  radius: 0.35,
+  speed: 5.4,
   sprintSpeed: 7.2,
   accel: 14,
   onGround: true,
@@ -323,7 +322,7 @@ function addBot(){
 }
 for(let i=0;i<3;i++) addBot();
 
-/* -------------------- Simple collision helpers (XZ plane cylinder vs AABB) -------------------- */
+/* -------------------- Collision & movement helpers -------------------- */
 function circleAABBOverlap(cx, cz, r, box){
   const hw = box.w*0.5, hd = box.d*0.5;
   const bx0 = box.x - hw, bx1 = box.x + hw;
@@ -333,7 +332,6 @@ function circleAABBOverlap(cx, cz, r, box){
   const dx = cx - px, dz = cz - pz;
   return (dx*dx + dz*dz) <= r*r;
 }
-
 function moveWithCollisions(entity, desiredX, desiredZ){
   const startX = entity.pos.x, startZ = entity.pos.z;
   let nx = desiredX, nz = desiredZ;
@@ -388,8 +386,6 @@ function raycast(origin, dir, maxDist){
   }
   return null;
 }
-
-/* Ray-AABB intersection (slab method) */
 function rayIntersectAABB(orig, dir, min, max){
   let tmin = (min.x - orig.x) / dir.x, tmax = (max.x - orig.x) / dir.x;
   if(tmin > tmax) { let tmp=tmin;tmin=tmax;tmax=tmp; }
@@ -413,11 +409,9 @@ const masterGain = AudioCtx.createGain(); masterGain.gain.value = 0.8; masterGai
 function sfxShot(){ const o=AudioCtx.createOscillator(); const g=AudioCtx.createGain(); o.type='square'; o.frequency.value=1100; g.gain.value=0.0001; o.connect(g); g.connect(masterGain); const now=AudioCtx.currentTime; g.gain.exponentialRampToValueAtTime(0.12, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.18); o.start(now); o.stop(now+0.19); }
 function sfxHit(){ const o=AudioCtx.createOscillator(); const g=AudioCtx.createGain(); o.type='sawtooth'; o.frequency.value=220; g.gain.value=0.0001; o.connect(g); g.connect(masterGain); const now=AudioCtx.currentTime; g.gain.exponentialRampToValueAtTime(0.18, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.15); o.start(now); o.stop(now+0.16); }
 function sfxReload(){ const o=AudioCtx.createOscillator(); const g=AudioCtx.createGain(); o.frequency.value=420; o.type='sine'; g.gain.value=0.0001; o.connect(g); g.connect(masterGain); const now=AudioCtx.currentTime; g.gain.exponentialRampToValueAtTime(0.08, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.4); o.start(now); o.stop(now+0.42); }
-
-/* Resume audio on first interaction due to browser policy */
 window.addEventListener('pointerdown', ()=>{ if(AudioCtx.state === 'suspended') AudioCtx.resume(); }, { once:true });
 
-/* -------------------- Input handling (pointer lock + keys + mouse) -------------------- */
+/* -------------------- Input handling -------------------- */
 let keys = {};
 window.addEventListener('keydown', (e)=>{ keys[e.code]=true; if(e.code==='KeyR') tryReload(); });
 window.addEventListener('keyup', (e)=>{ keys[e.code]=false; });
@@ -428,41 +422,32 @@ document.addEventListener('pointerlockchange', ()=>{
   pointerLocked = document.pointerLockElement === canvas;
   document.querySelector('.centerHud').style.display = pointerLocked ? 'none' : 'block';
   const plState = document.getElementById('plState');
-  if(pointerLocked){
-    plState.textContent = 'ON';
-    plState.style.color = 'var(--on)';
-  } else {
-    plState.textContent = 'OFF';
-    plState.style.color = 'var(--off)';
-  }
+  if(pointerLocked){ plState.textContent = 'ON'; plState.style.color = 'var(--on)'; }
+  else { plState.textContent = 'OFF'; plState.style.color = 'var(--off)'; }
 });
 
 let mouseDX = 0, mouseDY = 0;
 let _lastMouseClientX = null, _lastMouseClientY = null;
 
-/* Mouse move: support pointer-lock (preferred) and fallback free-look while holding left mouse button */
+/* Mouse move: pointer-lock preferred; fallback free-look while holding left mouse button */
 canvas.addEventListener('mousemove', (e) => {
-  // movementX / movementY exist in modern browsers; guard just in case
   const mx = (typeof e.movementX === 'number') ? e.movementX : (e.clientX - (_lastMouseClientX || e.clientX));
   const my = (typeof e.movementY === 'number') ? e.movementY : (e.clientY - (_lastMouseClientY || e.clientY));
   _lastMouseClientX = e.clientX;
   _lastMouseClientY = e.clientY;
-
-  // When pointer-locked, always apply relative motion.
-  // When not pointer-locked, allow free-look if the left mouse button is held (mouseDown).
   if (pointerLocked || mouseDown) {
     mouseDX += mx;
     mouseDY += my;
   }
 });
 
-/* -------------------- Weapon fire logic (hitscan pistol) -------------------- */
+/* -------------------- Weapon & reload -------------------- */
 function fireWeapon(){
   const w = Player.weapon;
   const now = performance.now();
   if(w.isReloading) return;
-  if(w.mag <= 0){ return; }
-  const cooldown = 60000 / w.rpm; // ms per shot
+  if(w.mag <= 0) return;
+  const cooldown = 60000 / w.rpm;
   if(now - w.lastShot < cooldown) return;
   w.lastShot = now;
   w.mag--;
@@ -493,13 +478,9 @@ function fireWeapon(){
         const best = parseInt(localStorage.getItem('mini_fps_best') || '0', 10);
         if(Player.kills > best) localStorage.setItem('mini_fps_best', String(Player.kills));
       }
-    } else {
-      // wall hit: could flash or decal
     }
   }
 }
-
-/* Rotate direction vector by small pitch/yaw deltas (in radians) */
 function rotateDirByAngles(dir, dYaw, dPitch){
   const cosy = Math.cos(dYaw), siny=Math.sin(dYaw);
   let x = dir.x*cosy - dir.z*siny;
@@ -510,8 +491,6 @@ function rotateDirByAngles(dir, dYaw, dPitch){
   const len = Math.hypot(x,z,y) || 1;
   return new Vec3(x/len,y/len,z/len);
 }
-
-/* Attempts reload: sets timeout for reloadTime */
 function tryReload(){
   const w = Player.weapon;
   if(w.isReloading) return;
@@ -529,8 +508,6 @@ function tryReload(){
     document.getElementById('reserve').textContent = w.reserve;
   }, w.reloadTime * 1000);
 }
-
-/* -------------------- Camera helpers -------------------- */
 function cameraForward(){
   const cy = Math.cos(Player.yaw), sy = Math.sin(Player.yaw);
   const cp = Math.cos(Player.pitch), sp = Math.sin(Player.pitch);
@@ -538,7 +515,7 @@ function cameraForward(){
 }
 function cameraWorldPos(){ return new Vec3(Player.pos.x, Player.eyeHeight + Player.pos.y, Player.pos.z); }
 
-/* -------------------- Simple AI: vision, shooting, patrol -------------------- */
+/* -------------------- AI (same as before) -------------------- */
 function botUpdate(bot, dt){
   if(!bot.alive){
     if(!bot._respawnTimer) bot._respawnTimer = 3 + Math.random()*4;
@@ -561,7 +538,6 @@ function botUpdate(bot, dt){
     if(towp.length() < 0.8) { bot.wpIndex = (bot.wpIndex+1) % bot.waypoints.length; }
     else facing = towp.normalize();
   }
-
   const dot = dirToPlayer.x * facing.x + dirToPlayer.z * facing.z;
   const inFOV = dot > Math.cos(degToRad(55));
   let sees = false;
@@ -576,7 +552,6 @@ function botUpdate(bot, dt){
     }
     if(!blocked) sees = true;
   }
-
   if(sees){
     bot._aimAtPlayer = true;
     bot.reactTimer -= dt;
@@ -587,7 +562,6 @@ function botUpdate(bot, dt){
       const rx = (Math.random()*2-1) * degToRad(spread);
       const ry = (Math.random()*2-1) * degToRad(spread);
       const dir = rotateDirByAngles(baseDir, rx, ry);
-      const hit = raycast(origin, dir, 60);
       const center = cameraWorldPos();
       const oc = Vec3.sub(origin, center);
       const a = Vec3.dot(dir, dir);
@@ -625,13 +599,12 @@ function botUpdate(bot, dt){
   }
 }
 
-/* -------------------- Player respawn logic -------------------- */
+/* -------------------- Respawn & physics loop -------------------- */
 function respawnPlayer(){
   Player.pos.set(0,0,-8); Player.yVel=0; Player.onGround=true; Player.health=Player.maxHealth;
   document.getElementById('hp').textContent = Player.health;
 }
 
-/* -------------------- Fixed-step game loop -------------------- */
 const PHYS_DT = 1/120;
 let accumulator = 0;
 let lastTime = nowMs();
@@ -676,19 +649,15 @@ function updatePhysics(dt){
   Player.recoilState.pitch = approach(Player.recoilState.pitch, 0, 5*dt);
   Player.recoilState.yaw = approach(Player.recoilState.yaw, 0, 6*dt);
 
-  const w = Player.weapon;
-  if(keys['Mouse0'] || keys['Button1']){} // placeholder
-
   for(const b of bots) botUpdate(b, dt);
 
   if(pointerLocked && mouseDown) {
     fireWeapon();
   }
 }
-
 function approach(value, target, delta){ if(value < target) return Math.min(value+delta,target); return Math.max(value-delta,target); }
 
-/* -------------------- Render loop -------------------- */
+/* -------------------- Rendering -------------------- */
 function renderScene(alpha){
   const eyePos = cameraWorldPos();
   const pitch = Player.pitch + Player.recoilState.pitch;
@@ -724,7 +693,6 @@ function renderScene(alpha){
 
   gl.bindVertexArray(null);
 }
-
 function drawBox(x,y,z,w,h,d,color,modelMat){
   const m = Mat4.identity();
   const sx = w, sy = h, sz = d;
@@ -735,12 +703,11 @@ function drawBox(x,y,z,w,h,d,color,modelMat){
   gl.drawElements(gl.TRIANGLES, cubeIdx.length, gl.UNSIGNED_SHORT, 0);
 }
 
-/* -------------------- Mouse button handling -------------------- */
+/* -------------------- Mouse & main loop -------------------- */
 let mouseDown = false;
 canvas.addEventListener('mousedown', (e)=>{ if(e.button===0) mouseDown=true; });
 canvas.addEventListener('mouseup', (e)=>{ if(e.button===0) mouseDown=false; });
 
-/* -------------------- Main loop (fixed-step physics & render) -------------------- */
 function tick(){
   const tNow = nowMs();
   let delta = (tNow - lastTime)/1000;
@@ -774,22 +741,38 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
-/* -------------------- Simple UI buttons -------------------- */
+/* -------------------- UI handlers (teleport on Start) -------------------- */
 document.getElementById('startBtn').addEventListener('click', ()=>{
-  // try to lock pointer and focus canvas
+  // Teleport player to a random spawn point inside the arena
+  const sp = MAP.spawnPoints[Math.floor(Math.random() * MAP.spawnPoints.length)];
+  Player.pos.set(sp.x, 0, sp.z);
+  Player.yVel = 0;
+  Player.vel.set(0,0,0);
+  Player.yaw = 0;
+  Player.pitch = 0;
+  Player.recoilState.pitch = 0;
+  Player.recoilState.yaw = 0;
+  mouseDX = 0; mouseDY = 0;
+  // Request pointer lock (best) or focus canvas as fallback
   if (canvas.requestPointerLock) {
     canvas.requestPointerLock();
   } else {
     canvas.focus();
   }
+  // Reset kills and bots
   Player.kills = 0;
   document.getElementById('kills').textContent = 0;
   bots = []; for(let i=0;i<3;i++) addBot();
+  // update HUD immediately
+  document.getElementById('hp').textContent = Player.health;
+  document.getElementById('ammo').textContent = Player.weapon.mag;
+  document.getElementById('reserve').textContent = Player.weapon.reserve;
 });
 
 document.getElementById('addBotBtn').addEventListener('click', ()=>{ addBot(); });
+document.getElementById('toggleDebugBtn').addEventListener('click', ()=>{ debugShown = !debugShown; document.getElementById('debug').style.display = debugShown ? 'block' : 'none'; });
 
-/* -------------------- Utility: resize canvas to fit window -------------------- */
+/* -------------------- Resize & input fallbacks -------------------- */
 function resize(){
   const dpr = window.devicePixelRatio || 1;
   const w = Math.floor(window.innerWidth * dpr);
@@ -801,7 +784,6 @@ function resize(){
 window.addEventListener('resize', resize);
 resize();
 
-/* -------------------- Helper: shooting via keyboard / mouse input mappings -------------------- */
 window.addEventListener('mousedown', (e)=>{ if(e.button===0 && pointerLocked) mouseDown = true; });
 window.addEventListener('mouseup', (e)=>{ if(e.button===0) mouseDown = false; });
 window.addEventListener('keydown', (e)=>{ if(e.code === 'Escape') document.exitPointerLock && document.exitPointerLock(); });
@@ -810,10 +792,12 @@ window.addEventListener('keydown', (e)=>{ if(e.code === 'Escape') document.exitP
 lastTime = nowMs();
 requestAnimationFrame(tick);
 
-/* -------------------- End of prototype notes -------------------- */
-/* Pointer-lock indicator added and mousemove fallback implemented.
-   Click "Start" and allow pointer lock in the browser prompt to get the best FPS look controls.
-   If pointer lock is unavailable, hold the left mouse button while moving the mouse to look around.
+/* -------------------- Notes -------------------- */
+/* When you press Start:
+   - Player is teleported to a spawn point in the arena (random).
+   - Velocity, yaw/pitch and recoil are reset to avoid camera/physics stuck states.
+   - Pointer lock is requested for full mouse look.
+   If pointer lock isn't granted, you can still look by holding left mouse button and moving pointer (fallback).
 */
 </script>
 </body>
