@@ -85,7 +85,7 @@ let high = parseInt(localStorage.getItem('gd_high')||'0',10);
 highEl.textContent = high;
 
 // Player
-const player = { x:150, y:0, w:34, h:34, vy:0, grounded:true };
+const player = { x:150, y:0, w:34, h:34, vy:0, grounded:true, worldX:0 };
 
 // Camera/world
 let worldX = 0;
@@ -140,7 +140,7 @@ function loadLevel(i){
   scrollSpeed=220*currentLevel.speedMul;
   segments=buildSegments(currentLevel);
   spikes=buildSpikes(currentLevel);
-  worldX=0;
+  player.worldX=0;
   player.y=H-80-player.h;
   player.vy=0;
   player.grounded=true;
@@ -159,7 +159,7 @@ canvas.addEventListener('touchstart', e=>{ doJump(); e.preventDefault(); }, {pas
 
 // --- Collision ---
 function checkSpikeCollision(){
-  const px=player.x+worldX, py=player.y;
+  const px=player.worldX, py=player.y;
   for(const s of spikes){
     const sx=s.x, sw=s.w, sy=s.y, sTop=sy-18;
     if(px+player.w>sx && px<sx+sw && py+player.h>sTop) return true;
@@ -167,8 +167,8 @@ function checkSpikeCollision(){
   return false;
 }
 function groundUnderPlayer(){
-  const px=player.x+worldX;
-  for(const seg of segments){ if(px+player.w/2 >= seg.x && px+player.w/2 <= seg.x+seg.w) return seg.y; }
+  const px = player.worldX;
+  for(const seg of segments){ if(px + player.w/2 >= seg.x && px + player.w/2 <= seg.x + seg.w) return seg.y; }
   return null;
 }
 
@@ -179,17 +179,37 @@ function updateScoreUI(){ scoreEl.textContent=Math.floor(score); highEl.textCont
 // --- Game loop ---
 let last=performance.now();
 function loop(now){
-  const dt=Math.min(0.033,(now-last)/1000); last=now;
+  const dt = Math.min(0.033, (now-last)/1000);
+  last = now;
+
   if(running){
-    worldX+=scrollSpeed*dt; score+=scrollSpeed*dt*0.02;
-    player.vy+=GRAV*dt; player.y+=player.vy*dt;
-    const gY=groundUnderPlayer();
-    if(gY!==null){ const ty=gY-player.h; if(player.y+player.h>ty && player.vy>=0){ player.y=ty; player.vy=0; player.grounded=true; } }
-    else { player.grounded=false; if(player.y>H+60) die(); }
+    const playerSpeed = scrollSpeed * 1.05; // player slightly faster than camera
+    player.worldX += playerSpeed * dt;
+    worldX = player.worldX - player.x; // camera follows player
+
+    // physics
+    player.vy += GRAV * dt;
+    player.y += player.vy * dt;
+
+    const gY = groundUnderPlayer();
+    if(gY !== null){
+      const ty = gY - player.h;
+      if(player.y + player.h > ty && player.vy >= 0){ player.y = ty; player.vy = 0; player.grounded = true; }
+    } else { player.grounded=false; if(player.y>H+60) die(); }
+
     if(checkSpikeCollision()) die();
-    if(worldX>=levelLength-200){ running=false; statusEl.textContent='Complete!'; beep(1200,0.2,0.18,'sine'); if(score>high){ high=Math.floor(score); localStorage.setItem('gd_high',high); } updateScoreUI(); }
+
+    if(player.worldX >= levelLength-200){
+      running=false;
+      statusEl.textContent='Complete!';
+      beep(1200,0.2,0.18,'sine');
+      if(score>high){ high=Math.floor(score); localStorage.setItem('gd_high',high); }
+    }
+
+    score += playerSpeed*dt*0.02;
     updateScoreUI();
   }
+
   render();
   requestAnimationFrame(loop);
 }
@@ -238,7 +258,7 @@ function render(){
   ctx.restore();
 
   // progress bar
-  const progress=Math.min(1,worldX/Math.max(1,levelLength-200));
+  const progress=Math.min(1,player.worldX/Math.max(1,levelLength-200));
   ctx.fillStyle='#ffffff22'; ctx.fillRect(20,10,W-40,8);
   ctx.fillStyle='#ffcc33'; ctx.fillRect(20,10,(W-40)*progress,8);
 }
