@@ -3,17 +3,19 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Mini FPS MVP — Browser (WebGL)</title>
+<title>Mini FPS MVP — Browser (WebGL) — Patched</title>
 <style>
   :root{
     --bg:#0b0f14;
     --panel: rgba(255,255,255,0.04);
     --accent:#40c4ff;
     --ui:#e6eef7;
+    --on:#39e36b;
+    --off:#ff6b6b;
   }
   html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--ui);}
   #root{position:relative;height:100vh;overflow:hidden;display:flex;align-items:stretch;}
-  canvas#gl{flex:1;display:block;background:#334;outline:none;}
+  canvas#gl{flex:1;display:block;background:#334;outline:none;cursor:crosshair;}
   .hud {
     position:absolute;left:0;right:0;top:0;pointer-events:none;
     display:flex;justify-content:space-between;padding:12px;
@@ -27,7 +29,8 @@
   button { background:var(--accent); border:none;padding:6px 10px;border-radius:6px;color:#012;cursor:pointer;font-weight:700 }
   .secondary { background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--ui) }
   #menu { position:absolute;left:12px;top:72px;pointer-events:auto; }
-  #debug { position:absolute;left:12px;top:12px;color:#bfe; background:rgba(0,0,0,0.25);padding:6px;border-radius:6px;font-size:12px }
+  #debug { position:absolute;left:12px;top:12px;color:#bfe; background:rgba(0,0,0,0.25);padding:6px;border-radius:6px;font-size:12px;white-space:pre-line;max-width:380px; }
+  #plIndicator { position:absolute; right:12px; top:12px; padding:6px 10px; border-radius:8px; font-weight:700; }
   @media (max-width:720px){
     #minimap{display:none}
   }
@@ -43,6 +46,8 @@
   </div>
 
   <div id="debug">Loading...</div>
+
+  <div id="plIndicator" class="panel small" style="background:var(--panel);">Pointer Lock: <span id="plState" style="color:var(--off)">OFF</span></div>
 
   <div class="centerHud">
     <div style="font-size:20px;font-weight:800">Mini FPS MVP</div>
@@ -60,7 +65,7 @@
   <div id="minimap"></div>
 
   <div id="menu" style="display:flex;flex-direction:column;gap:8px">
-    <button id="startBtn">Start</button>
+    <button id="startBtn">Start (request pointer lock)</button>
     <button id="toggleDebugBtn" class="secondary">Toggle Debug</button>
     <button id="addBotBtn" class="secondary">+ Bot</button>
   </div>
@@ -68,16 +73,10 @@
 
 <script>
 /*
-Mini FPS MVP (single-file)
-- WebGL rendering for simple colored boxes and a sphere-bot.
-- First-person controls (pointer lock), WASD movement, sprint, jump.
-- Hitscan pistol with recoil, ammo, reload.
-- Simple AI bots that patrol waypoints and shoot at the player when in LOS.
-- Collision: simple cylinder collision in XZ plane against AABB obstacles (no full capsule-triangle).
-- Fixed-step update loop for physics/AI, render interpolation.
-- WebAudio for simple firing and hit sounds.
-- LocalStorage to store a "best kills" highscore.
-This is a compact, fully-browser prototype — intended as a starting point aligning to the detailed blueprint.
+Patched Mini FPS MVP
+- Adds pointer-lock indicator and a mousemove fallback: pointer-lock preferred, fallback free-look while holding left mouse button.
+- Start button requests pointer lock and focuses canvas as fallback.
+- Otherwise same compact MVP.
 */
 
 /* -------------------- Utilities (vec/mat small lib) -------------------- */
@@ -260,8 +259,6 @@ const MAP = {
   ]
 };
 
-/* Scale world to meters; our rendering uses meters as units directly for matrix transforms */
-
 /* -------------------- Player state & controller -------------------- */
 const Player = {
   pos: new Vec3(0, 0, -8),   // x,y,z (y used for vertical eye height)
@@ -302,7 +299,6 @@ class Bot {
     this.color = [0.9,0.5,0.5];
   }
   static makeWaypoints(cx,cz){
-    // small local patrol near spawn
     return [
       {x: cx, z: cz},
       {x: cx + (Math.random()*6-3), z: cz + (Math.random()*6-3)},
@@ -329,31 +325,25 @@ for(let i=0;i<3;i++) addBot();
 
 /* -------------------- Simple collision helpers (XZ plane cylinder vs AABB) -------------------- */
 function circleAABBOverlap(cx, cz, r, box){
-  // box: has x,z (center), w,d (extent half width used), returns true if horizontal circle intersects rectangle
   const hw = box.w*0.5, hd = box.d*0.5;
   const bx0 = box.x - hw, bx1 = box.x + hw;
   const bz0 = box.z - hd, bz1 = box.z + hd;
-  // closest point on AABB
   const px = clamp(cx, bx0, bx1);
   const pz = clamp(cz, bz0, bz1);
   const dx = cx - px, dz = cz - pz;
   return (dx*dx + dz*dz) <= r*r;
 }
 
-/* Sweep movement with simple rejection/slide: attempt move and if collision, slide along obstacle */
 function moveWithCollisions(entity, desiredX, desiredZ){
   const startX = entity.pos.x, startZ = entity.pos.z;
   let nx = desiredX, nz = desiredZ;
-  // naive collision: if destination is inside obstacle, try sliding on each axis
   for(const o of MAP.obstacles){
     if(circleAABBOverlap(nx, nz, entity.radius, o)){
-      // try x-only
       if(!circleAABBOverlap(nx, startZ, entity.radius, o)){
         nz = startZ;
       } else if(!circleAABBOverlap(startX, nz, entity.radius, o)){
         nx = startX;
       } else {
-        // block both: stay
         nx = startX; nz = startZ;
       }
     }
@@ -361,20 +351,16 @@ function moveWithCollisions(entity, desiredX, desiredZ){
   entity.pos.x = nx; entity.pos.z = nz;
 }
 
-/* -------------------- Raycast utilities (ray in XZ plane for hitscan against bots and AABB) -------------------- */
-/* We'll raycast in 3D from camera pos (eye) along direction; test dynamic bot spheres and AABB triangles (approximated as boxes) */
+/* -------------------- Raycast utilities -------------------- */
 function raycast(origin, dir, maxDist){
-  // return hit {t, hitType:'bot'|'wall', target, point}
   let nearest = { t: Infinity, info: null };
-  // bots as spheres, radius in 3D using bot radius and y at eye height approximated to 1.0 m
   for(const b of bots){
     if(!b.alive) continue;
-    // sphere center at (b.pos.x, 1.0, b.pos.z)
     const center = new Vec3(b.pos.x,1.0,b.pos.z);
     const oc = Vec3.sub(origin, center);
     const a = Vec3.dot(dir, dir);
     const bco = 2 * Vec3.dot(oc, dir);
-    const c = Vec3.dot(oc, oc) - 0.6*0.6; // sphere radius ~0.6m
+    const c = Vec3.dot(oc, oc) - 0.6*0.6;
     const disc = bco*bco - 4*a*c;
     if(disc < 0) continue;
     const sqrtD = Math.sqrt(disc);
@@ -386,9 +372,7 @@ function raycast(origin, dir, maxDist){
       nearest.info = {hitType:'bot', target:b};
     }
   }
-  // AABB walls: approximate by testing slab intersection in full 3D, but our boxes have height h above ground; we'll treat them as centered vertically
   for(const o of MAP.obstacles){
-    // box min/max in 3D
     const hw = o.w*0.5, hd = o.d*0.5, hh = o.h;
     const min = {x: o.x - hw, y: 0, z: o.z - hd};
     const max = {x: o.x + hw, y: hh, z: o.z + hd};
@@ -440,20 +424,44 @@ window.addEventListener('keyup', (e)=>{ keys[e.code]=false; });
 
 let pointerLocked = false;
 canvas.addEventListener('click', ()=>{ canvas.requestPointerLock && canvas.requestPointerLock(); });
-document.addEventListener('pointerlockchange', ()=>{ pointerLocked = document.pointerLockElement === canvas; document.querySelector('.centerHud').style.display = pointerLocked ? 'none' : 'block'; });
+document.addEventListener('pointerlockchange', ()=>{
+  pointerLocked = document.pointerLockElement === canvas;
+  document.querySelector('.centerHud').style.display = pointerLocked ? 'none' : 'block';
+  const plState = document.getElementById('plState');
+  if(pointerLocked){
+    plState.textContent = 'ON';
+    plState.style.color = 'var(--on)';
+  } else {
+    plState.textContent = 'OFF';
+    plState.style.color = 'var(--off)';
+  }
+});
 
 let mouseDX = 0, mouseDY = 0;
-canvas.addEventListener('mousemove', (e)=>{ if(!pointerLocked) return; mouseDX += e.movementX; mouseDY += e.movementY; });
+let _lastMouseClientX = null, _lastMouseClientY = null;
+
+/* Mouse move: support pointer-lock (preferred) and fallback free-look while holding left mouse button */
+canvas.addEventListener('mousemove', (e) => {
+  // movementX / movementY exist in modern browsers; guard just in case
+  const mx = (typeof e.movementX === 'number') ? e.movementX : (e.clientX - (_lastMouseClientX || e.clientX));
+  const my = (typeof e.movementY === 'number') ? e.movementY : (e.clientY - (_lastMouseClientY || e.clientY));
+  _lastMouseClientX = e.clientX;
+  _lastMouseClientY = e.clientY;
+
+  // When pointer-locked, always apply relative motion.
+  // When not pointer-locked, allow free-look if the left mouse button is held (mouseDown).
+  if (pointerLocked || mouseDown) {
+    mouseDX += mx;
+    mouseDY += my;
+  }
+});
 
 /* -------------------- Weapon fire logic (hitscan pistol) -------------------- */
 function fireWeapon(){
   const w = Player.weapon;
   const now = performance.now();
   if(w.isReloading) return;
-  if(w.mag <= 0){ // click
-    // empty click sound could be added
-    return;
-  }
+  if(w.mag <= 0){ return; }
   const cooldown = 60000 / w.rpm; // ms per shot
   if(now - w.lastShot < cooldown) return;
   w.lastShot = now;
@@ -461,59 +469,44 @@ function fireWeapon(){
   document.getElementById('ammo').textContent = w.mag;
   sfxShot();
 
-  // compute firing direction with spread & recoil
-  // base camera forward dir
   let dir = cameraForward();
-  // apply spread cone in degrees
   const spread = w.spreadDeg || 1.2;
   const r = degToRad(spread) * (Math.random()*0.5 + 0.5);
   const ang = Math.random() * Math.PI * 2;
   const sx = Math.cos(ang) * r, sy = Math.sin(ang) * r;
-  // apply small offset via yaw/pitch rotation
-  dir = rotateDirByAngles(dir, sy, sx); // small yaw (horizontal) and pitch (vertical) offsets
+  dir = rotateDirByAngles(dir, sy, sx);
 
-  // recoil: bump camera
   Player.recoilState.pitch += (w.recoil.pitch * (0.8 + Math.random()*0.4));
   Player.recoilState.yaw += (Math.random()*2-1) * w.recoil.yaw;
 
-  // perform a raycast up to range (e.g., 80m)
   const origin = cameraWorldPos();
   const hit = raycast(origin, dir, 80);
   if(hit){
     if(hit.info.hitType === 'bot'){
-      // hit bot
       const b = hit.info.target;
-      b.health -= 40; // pistol base damage
+      b.health -= 40;
       sfxHit();
       if(b.health <= 0 && b.alive){
         b.alive = false;
         Player.kills++;
         document.getElementById('kills').textContent = Player.kills;
-        // store highscore
         const best = parseInt(localStorage.getItem('mini_fps_best') || '0', 10);
         if(Player.kills > best) localStorage.setItem('mini_fps_best', String(Player.kills));
       }
     } else {
-      // hit wall -> spawn impact effect (visual feedback)
-      // small debug flash handled in render
+      // wall hit: could flash or decal
     }
   }
 }
 
 /* Rotate direction vector by small pitch/yaw deltas (in radians) */
 function rotateDirByAngles(dir, dYaw, dPitch){
-  // yaw rotates around Y; pitch rotates around camera right axis
-  // apply yaw:
   const cosy = Math.cos(dYaw), siny=Math.sin(dYaw);
   let x = dir.x*cosy - dir.z*siny;
   let z = dir.x*siny + dir.z*cosy;
   let y = dir.y;
-  // right axis is cross(up, dir)
-  // apply pitch by rotating in vertical plane: rotate towards up/down:
   const cosP = Math.cos(dPitch), sinP = Math.sin(dPitch);
-  // compute forward vector in local forward-up plane and rotate
-  // Simplify: pitch by adjusting y and scaling x,z
-  y = y * cosP + Math.sqrt(x*x + z*z) * sinP * -1; // approximate
+  y = y * cosP + Math.sqrt(x*x + z*z) * sinP * -1;
   const len = Math.hypot(x,z,y) || 1;
   return new Vec3(x/len,y/len,z/len);
 }
@@ -539,7 +532,6 @@ function tryReload(){
 
 /* -------------------- Camera helpers -------------------- */
 function cameraForward(){
-  // compute forward vector from yaw/pitch
   const cy = Math.cos(Player.yaw), sy = Math.sin(Player.yaw);
   const cp = Math.cos(Player.pitch), sp = Math.sin(Player.pitch);
   return new Vec3(cp*cy, sp, cp*sy).normalize();
@@ -549,7 +541,6 @@ function cameraWorldPos(){ return new Vec3(Player.pos.x, Player.eyeHeight + Play
 /* -------------------- Simple AI: vision, shooting, patrol -------------------- */
 function botUpdate(bot, dt){
   if(!bot.alive){
-    // respawn after a delay
     if(!bot._respawnTimer) bot._respawnTimer = 3 + Math.random()*4;
     bot._respawnTimer -= dt;
     if(bot._respawnTimer <= 0){
@@ -559,12 +550,9 @@ function botUpdate(bot, dt){
     }
     return;
   }
-  // perception: check if player in FOV & LOS
-  // compute vector from bot to player eye
   const toPlayer = Vec3.sub(new Vec3(Player.pos.x, 1.0, Player.pos.z), new Vec3(bot.pos.x, 1.0, bot.pos.z));
   const dist = Math.hypot(toPlayer.x, toPlayer.z, toPlayer.y);
   const dirToPlayer = toPlayer.copy().normalize();
-  // approximate bot facing vector towards waypoint or player
   let facing = new Vec3(1,0,0);
   if(bot._aimAtPlayer) facing = dirToPlayer;
   else {
@@ -574,19 +562,11 @@ function botUpdate(bot, dt){
     else facing = towp.normalize();
   }
 
-  // check LOS (raycast) and cone
   const dot = dirToPlayer.x * facing.x + dirToPlayer.z * facing.z;
-  const inFOV = dot > Math.cos(degToRad(55)); // ~110deg FOV
+  const inFOV = dot > Math.cos(degToRad(55));
   let sees = false;
   if(inFOV){
     const origin = new Vec3(bot.pos.x, 1.0, bot.pos.z);
-    // simple raycast to player eye, limit to 60m
-    const hit = raycast(origin, dirToPlayer, 60);
-    if(hit && hit.info && hit.info.hitType === 'bot' && hit.info.target === undefined){
-      // improbable
-    }
-    // if raycast returns player (we treat player as dynamic sphere? Our raycast doesn't test player; do manual test)
-    // manual block test to player: test if any wall intersects segment
     let blocked = false;
     for(const o of MAP.obstacles){
       const min = {x: o.x - o.w*0.5, y:0, z:o.z - o.d*0.5};
@@ -599,53 +579,38 @@ function botUpdate(bot, dt){
 
   if(sees){
     bot._aimAtPlayer = true;
-    // reaction time before shooting
     bot.reactTimer -= dt;
     if(bot.reactTimer <= 0){
-      // shoot at player: simple hitscan with some inaccuracy based on distance
       const origin = new Vec3(bot.pos.x,1.0,bot.pos.z);
       const baseDir = dirToPlayer;
-      const spread = 1.8 * (1 + dist/40); // more spread at distance
+      const spread = 1.8 * (1 + dist/40);
       const rx = (Math.random()*2-1) * degToRad(spread);
       const ry = (Math.random()*2-1) * degToRad(spread);
       const dir = rotateDirByAngles(baseDir, rx, ry);
       const hit = raycast(origin, dir, 60);
-      if(hit && hit.info && hit.info.hitType === 'bot') {
-        // hits another bot — ignore
-      } else {
-        // check whether hit player
-        // distance to player along ray param t
-        // compute t to player's eye sphere
-        const center = cameraWorldPos();
-        const oc = Vec3.sub(origin, center);
-        const a = Vec3.dot(dir, dir);
-        const bco = 2 * Vec3.dot(oc, dir);
-        const c = Vec3.dot(oc, oc) - 0.6*0.6;
-        const disc = bco*bco - 4*a*c;
-        if(disc >= 0){
-          const sqrtD = Math.sqrt(disc);
-          const t1 = (-bco - sqrtD) / (2*a);
-          const t2 = (-bco + sqrtD) / (2*a);
-          const t = t1>0 ? t1 : (t2>0 ? t2 : Infinity);
-          if(t > 0 && t < 60){
-            // bot hits player
-            Player.health -= 16; if(Player.health < 0) Player.health = 0;
-            // camera hit feedback
-            Player.recoilState.pitch += 0.08;
-            sfxHit();
-            if(Player.health <= 0) {
-              // reset player
-              setTimeout(()=> respawnPlayer(), 400);
-            }
-          }
+      const center = cameraWorldPos();
+      const oc = Vec3.sub(origin, center);
+      const a = Vec3.dot(dir, dir);
+      const bco = 2 * Vec3.dot(oc, dir);
+      const c = Vec3.dot(oc, oc) - 0.6*0.6;
+      const disc = bco*bco - 4*a*c;
+      if(disc >= 0){
+        const sqrtD = Math.sqrt(disc);
+        const t1 = (-bco - sqrtD) / (2*a);
+        const t2 = (-bco + sqrtD) / (2*a);
+        const t = t1>0 ? t1 : (t2>0 ? t2 : Infinity);
+        if(t > 0 && t < 60){
+          Player.health -= 16; if(Player.health < 0) Player.health = 0;
+          Player.recoilState.pitch += 0.08;
+          sfxHit();
+          if(Player.health <= 0) setTimeout(()=> respawnPlayer(), 400);
         }
       }
-      bot.reactTimer = 0.4 + Math.random()*0.6; // cooldown between bot shots
+      bot.reactTimer = 0.4 + Math.random()*0.6;
     }
   } else {
     bot._aimAtPlayer = false;
     bot.reactTimer = clamp(bot.reactTimer, 0.05, 1.0);
-    // Patrol movement toward waypoint
     const wp = bot.waypoints[bot.wpIndex];
     const dir = new Vec3(wp.x - bot.pos.x, 0, wp.z - bot.pos.z);
     const dlen = Math.hypot(dir.x, dir.z);
@@ -675,75 +640,57 @@ document.getElementById('debug').style.display = debugShown ? 'block' : 'none';
 document.getElementById('toggleDebugBtn').addEventListener('click', ()=>{ debugShown = !debugShown; document.getElementById('debug').style.display = debugShown ? 'block' : 'none'; });
 
 function updatePhysics(dt){
-  // movement input
   let inputX = 0, inputZ = 0;
   if(keys['KeyW']||keys['ArrowUp']) inputZ += 1;
   if(keys['KeyS']||keys['ArrowDown']) inputZ -= 1;
   if(keys['KeyA']||keys['ArrowLeft']) inputX -= 1;
   if(keys['KeyD']||keys['ArrowRight']) inputX += 1;
   const moveLen = Math.hypot(inputX, inputZ);
-  if(moveLen > 0){
-    inputX /= moveLen; inputZ /= moveLen;
-  }
-
-  // compute desired speed
+  if(moveLen > 0){ inputX /= moveLen; inputZ /= moveLen; }
   const sprinting = keys['ShiftLeft'] || keys['ShiftRight'];
   const targetSpeed = sprinting ? Player.sprintSpeed : Player.speed;
 
-  // forward vector using yaw
   const forward = new Vec3(Math.cos(Player.yaw), 0, Math.sin(Player.yaw));
   const right = new Vec3(-forward.z, 0, forward.x);
   const desiredVel = new Vec3(0,0,0);
   desiredVel.x = forward.x * inputZ * targetSpeed + right.x * inputX * targetSpeed;
   desiredVel.z = forward.z * inputZ * targetSpeed + right.z * inputX * targetSpeed;
 
-  // accelerate toward desiredVel
   const dvx = desiredVel.x - Player.vel.x, dvz = desiredVel.z - Player.vel.z;
   const accel = Player.accel;
   Player.vel.x += clamp(dvx, -accel*dt, accel*dt);
   Player.vel.z += clamp(dvz, -accel*dt, accel*dt);
 
-  // jumping
   if((keys['Space'] || keys['KeyX']) && Player.onGround){
     Player.yVel = Player.jumpImpulse;
     Player.onGround = false;
   }
-  // gravity
   Player.yVel -= 9.81 * dt;
   Player.pos.y += Player.yVel * dt;
   if(Player.pos.y < 0){ Player.pos.y = 0; Player.onGround = true; Player.yVel = 0; }
 
-  // desired horizontal move
   const nx = Player.pos.x + Player.vel.x * dt;
   const nz = Player.pos.z + Player.vel.z * dt;
   moveWithCollisions(Player, nx, nz);
 
-  // recoil recovery
   Player.recoilState.pitch = approach(Player.recoilState.pitch, 0, 5*dt);
   Player.recoilState.yaw = approach(Player.recoilState.yaw, 0, 6*dt);
 
-  // update weapon cooldown / auto-fire input
   const w = Player.weapon;
   if(keys['Mouse0'] || keys['Button1']){} // placeholder
 
-  // bots update
   for(const b of bots) botUpdate(b, dt);
 
-  // simple auto-fire on left mouse button when pointer locked
   if(pointerLocked && mouseDown) {
     fireWeapon();
   }
-
-  // simple reload via R handled earlier
 }
 
 function approach(value, target, delta){ if(value < target) return Math.min(value+delta,target); return Math.max(value-delta,target); }
 
 /* -------------------- Render loop -------------------- */
 function renderScene(alpha){
-  // construct camera matrices
   const eyePos = cameraWorldPos();
-  // apply recoil state offsets to camera
   const pitch = Player.pitch + Player.recoilState.pitch;
   const yaw = Player.yaw + Player.recoilState.yaw;
   const cp = Math.cos(pitch), sp = Math.sin(pitch);
@@ -764,35 +711,23 @@ function renderScene(alpha){
   gl.uniformMatrix4fv(uniProj, false, proj);
   gl.uniform3fv(uniLight, new Float32Array([0.7,0.9,0.6]));
 
-  // draw floor as big thin cube
   drawBox(0, -0.02, 0, 40, 0.04, 60, [0.12,0.45,0.20], null);
 
-  // draw obstacles
   for(const o of MAP.obstacles){
     drawBox(o.x, o.h*0.5, o.z, o.w, o.h, o.d, o.color, null);
   }
 
-  // draw bots as small cubes or spheres
   for(const b of bots){
     if(!b.alive) continue;
     drawBox(b.pos.x, 0.9, b.pos.z, 0.7, 1.8, 0.7, b.color, null);
   }
 
-  // optionally draw debug: spawn points
-  // viewmodel / weapon not rendered in GL — draw simple crosshair in CSS overlay
-
   gl.bindVertexArray(null);
 }
 
-/* Draw a box centered at (x,y,z) with width w,height h, depth d and color */
 function drawBox(x,y,z,w,h,d,color,modelMat){
-  // model transform column-major
   const m = Mat4.identity();
-  // scale
   const sx = w, sy = h, sz = d;
-  // create model matrix manually (scale + translate)
-  // row-major set then transpose to column-major expected by shader? Our Mat4 functions expect column-major.
-  // We'll build column-major: scale then translate
   m[0] = sx; m[5] = sy; m[10] = sz;
   m[12] = x; m[13] = y; m[14] = z;
   gl.uniformMatrix4fv(uniModel, false, m);
@@ -813,7 +748,6 @@ function tick(){
   lastTime = tNow;
   accumulator += delta;
   while(accumulator >= PHYS_DT){
-    // update camera rotation from mouse deltas
     if(pointerLocked){
       const sens = 0.0022;
       Player.yaw -= mouseDX * sens;
@@ -827,7 +761,6 @@ function tick(){
   const alpha = accumulator / PHYS_DT;
   renderScene(alpha);
 
-  // update HUD elements
   document.getElementById('hp').textContent = Math.max(0, Math.floor(Player.health));
   document.getElementById('ammo').textContent = Player.weapon.mag;
   document.getElementById('reserve').textContent = Player.weapon.reserve;
@@ -843,11 +776,14 @@ function tick(){
 
 /* -------------------- Simple UI buttons -------------------- */
 document.getElementById('startBtn').addEventListener('click', ()=>{
-  // hide menu, request pointer lock
-  canvas.requestPointerLock && canvas.requestPointerLock();
+  // try to lock pointer and focus canvas
+  if (canvas.requestPointerLock) {
+    canvas.requestPointerLock();
+  } else {
+    canvas.focus();
+  }
   Player.kills = 0;
   document.getElementById('kills').textContent = 0;
-  // reset bots
   bots = []; for(let i=0;i<3;i++) addBot();
 });
 
@@ -874,16 +810,10 @@ window.addEventListener('keydown', (e)=>{ if(e.code === 'Escape') document.exitP
 lastTime = nowMs();
 requestAnimationFrame(tick);
 
-/* -------------------- End of prototype -------------------- */
-/* This file implements a compact MVP:
-   - first-person controller, pointer-lock look,
-   - simple collision on XZ plane against boxes,
-   - hitscan pistol, ammo and reload,
-   - basic bots with LOS perception & patrol,
-   - WebGL rendering of boxes and bots,
-   - WebAudio procedural SFX,
-   - HUD and localStorage highscore.
-   Expand by adding projectile weapons, navmesh/A*, ragdolls, more weapons, UI menus, sound assets, and improved rendering per the blueprint.
+/* -------------------- End of prototype notes -------------------- */
+/* Pointer-lock indicator added and mousemove fallback implemented.
+   Click "Start" and allow pointer lock in the browser prompt to get the best FPS look controls.
+   If pointer lock is unavailable, hold the left mouse button while moving the mouse to look around.
 */
 </script>
 </body>
