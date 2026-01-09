@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mini-Arcade Dashboard</title>
 <style>
-/* ========================================
-   CSS VARIABLEN
-   ======================================== */
 :root {
     --bg-color: #0d0d0d;
     --bg-gradient: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
@@ -38,9 +35,7 @@
     --pop-in-delay: 0.1s;
 }
 
-/* ========================================
-   GLOBAL STYLING
-   ======================================== */
+/* GLOBAL STYLING */
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--text-color); min-height:100vh; padding:2rem; overflow-x:hidden; }
 
@@ -48,6 +43,9 @@ body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--
 .header { text-align:center; margin-bottom:3rem; animation: slideDown var(--animation-speed) ease-out; }
 .header h1 { font-family:var(--font-title); font-size:clamp(2rem,5vw,4rem); color:#e0e0e0; text-shadow:0 2px 10px rgba(0,0,0,0.8); margin-bottom:0.5rem; }
 .header p { font-size:clamp(1rem,2vw,1.2rem); color: rgba(200,200,200,0.7); }
+
+/* PLAYER COUNT */
+#playerCount { margin-top:8px; font-size:1rem; color:rgba(200,200,200,0.8); opacity:0; animation: fadeInCount 1s forwards; }
 
 /* SETTINGS MENU TOP LEFT */
 .settings-menu { position:fixed; top:20px; left:20px; z-index:9999; font-family:var(--font-main); }
@@ -94,6 +92,7 @@ body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--
 @keyframes popIn { from{opacity:0; transform:scale(0.5) rotate(-10deg);} to{opacity:1; transform:scale(1) rotate(0deg);} }
 @keyframes fadeIn { from{opacity:0; transform:translateY(30px);} to{opacity:1; transform:translateY(0);} }
 @keyframes pulse { 0%,100%{transform:scale(1); box-shadow:0 0 20px rgba(0,0,0,0.5);} 50%{transform:scale(1.05); box-shadow:0 0 30px rgba(0,0,0,0.7);} }
+@keyframes fadeInCount { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: translateY(0); } }
 
 /* RESPONSIVE */
 @media (max-width:768px) {
@@ -111,24 +110,23 @@ body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--
     .dev-name{font-size:1.5rem;}
 }
 </style>
-</head>
 <body>
 
-<!-- HEADER -->
 <header class="header">
 <h1>🎮 MINI ARCADE 🎮</h1>
 <p>Choose Your Favourite Game!</p>
+<p id="playerCount">Current Players Online: 0</p>
 </header>
 
 <!-- SETTINGS MENU TOP LEFT -->
 <div class="settings-menu">
-    <button class="settings-btn">⋯</button>
-    <div class="settings-dropdown">
-        <button class="settings-option" data-category="mobile">Best Mobile Games</button>
-        <button class="settings-option" data-category="pc">Best PC Games</button>
-        <button class="settings-option" data-category="overall">Best Overall Games</button>
-    </div>
-    <div class="settings-list"></div>
+<button class="settings-btn">⋯</button>
+<div class="settings-dropdown">
+<button class="settings-option" data-category="mobile">Best Mobile Games</button>
+<button class="settings-option" data-category="pc">Best PC Games</button>
+<button class="settings-option" data-category="overall">Best Overall Games</button>
+</div>
+<div class="settings-list"></div>
 </div>
 
 <!-- DISCORD BUTTON TOP RIGHT -->
@@ -140,7 +138,7 @@ Contribute
 <!-- GAMES GRID -->
 <div class="games-grid" id="gamesGrid">
 
-<!-- === ALL ORIGINAL GAME CARDS === -->
+<!-- All original 9 game cards -->
 <a href="pixel-miner.html" class="game-card">
 <img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459256112237908031/image0.jpg?ex=69629da8&is=69614c28&hm=67d4cb4e7be11c6a2d878eff61b2b9a01f9e9543d301b8f01de20a1cde714311&" alt="Mining Idle" class="game-thumbnail">
 <h3 class="game-title">Pixel Miner</h3>
@@ -162,7 +160,7 @@ Contribute
 </a>
 
 <a href="ballon-clicker.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459274151918440673/image.png?ex=6962ae75&is=69615cf5&hm=07971e5f97f27c74341001756d3d6c8c3237f77d379a78f50765520ea8c99a6f&" alt="clicker" class="game-thumbnail">
+<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459274151918440673/image.png?ex=6962ae75&is=69615cf5&hm=07971e5f97f27c74341001756d3d6c8c3237f77d379a78f50765520ea8c99a6f" alt="clicker" class="game-thumbnail">
 <h3 class="game-title">Ballon Clicker</h3>
 </a>
 
@@ -205,7 +203,9 @@ const settingsDropdown = document.querySelector('.settings-dropdown');
 const settingsOptions = document.querySelectorAll('.settings-option');
 const settingsList = document.querySelector('.settings-list');
 
-settingsBtn.addEventListener('click', () => { settingsDropdown.style.display = settingsDropdown.style.display === 'flex' ? 'none' : 'flex'; });
+settingsBtn.addEventListener('click', () => {
+    settingsDropdown.style.display = settingsDropdown.style.display === 'flex' ? 'none' : 'flex';
+});
 
 const categories = {
     mobile: [
@@ -238,11 +238,23 @@ settingsOptions.forEach(btn=>{
     });
 });
 
-// TOUCH FEEDBACK FOR GAME CARDS
+// TOUCH FEEDBACK
 document.querySelectorAll('.game-card').forEach(card=>{
     card.addEventListener('touchstart',function(){this.style.transform='translateY(-5px) scale(0.98)';});
     card.addEventListener('touchend',function(){this.style.transform='';});
 });
+
+// FAKE PLAYER COUNT
+function updatePlayerCount() {
+    const count = Math.floor(Math.random() * (50 - 20 + 1)) + 20;
+    const playerCountEl = document.getElementById('playerCount');
+    playerCountEl.textContent = `Current Players Online: ${count}`;
+    playerCountEl.style.animation = 'none';
+    void playerCountEl.offsetWidth;
+    playerCountEl.style.animation = 'fadeInCount 1s forwards';
+}
+updatePlayerCount();
+setInterval(updatePlayerCount, 3000);
 </script>
 </body>
 </html>
