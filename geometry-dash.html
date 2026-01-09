@@ -26,24 +26,24 @@
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <div style="display:flex;gap:12px;align-items:center;">
-      <div class="panel big" id="levelLabel">Level 1</div>
-      <div class="panel muted">Score: <span id="score">0</span></div>
-      <div class="panel muted">Highscore: <span id="high">0</span></div>
-      <div class="panel muted">Status: <span id="status">Ready</span></div>
-    </div>
-
-    <canvas id="c" width="960" height="300" tabindex=0></canvas>
-
-    <div class="controls">
-      <button id="startBtn">Start / Restart</button>
-      <button id="nextBtn" class="small-btn">Next Level</button>
-      <button id="muteBtn" class="small-btn">Mute</button>
-      <div style="width:16px"></div>
-      <div class="muted">Controls: Space / Click to jump</div>
-    </div>
+<div class="wrap">
+  <div style="display:flex;gap:12px;align-items:center;">
+    <div class="panel big" id="levelLabel">Level 1</div>
+    <div class="panel muted">Score: <span id="score">0</span></div>
+    <div class="panel muted">Highscore: <span id="high">0</span></div>
+    <div class="panel muted">Status: <span id="status">Ready</span></div>
   </div>
+
+  <canvas id="c" width="960" height="300" tabindex=0></canvas>
+
+  <div class="controls">
+    <button id="startBtn">Start / Restart</button>
+    <button id="nextBtn" class="small-btn">Next Level</button>
+    <button id="muteBtn" class="small-btn">Mute</button>
+    <div style="width:16px"></div>
+    <div class="muted">Controls: Space / Click to jump</div>
+  </div>
+</div>
 
 <script>
 // --- Canvas setup ---
@@ -89,7 +89,7 @@ const player = { x:150, y:0, w:34, h:34, vy:0, grounded:true, worldX:0 };
 
 // Camera/world
 let worldX = 0;
-let scrollSpeed = 240; // base speed
+let scrollSpeed = 240;
 
 // Physics
 const GRAV = 1600;
@@ -148,8 +148,17 @@ function loadLevel(i){
   updateUI('Ready');
 }
 
-startBtn.addEventListener('click', ()=>{ loadLevel(levelIndex); running=true; statusEl.textContent='Running'; });
-nextBtn.addEventListener('click', ()=>{ loadLevel(levelIndex+1); running=false; statusEl.textContent='Loaded'; });
+// --- Start / Next ---
+startBtn.addEventListener('click', () => {
+  loadLevel(levelIndex);
+  running = true;          // start immediately
+  statusEl.textContent = 'Running';
+});
+nextBtn.addEventListener('click', () => {
+  loadLevel(levelIndex+1);
+  running = false;
+  statusEl.textContent = 'Loaded';
+});
 
 // --- Input ---
 function doJump(){ if(!running) return; if(player.grounded){ player.vy=-JUMP_V; player.grounded=false; beep(840,0.08,0.12,'square'); } }
@@ -183,18 +192,17 @@ function loop(now){
   last = now;
 
   if(running){
-    const playerSpeed = scrollSpeed * 1.05; // player slightly faster than camera
-    player.worldX += playerSpeed * dt;
-    worldX = player.worldX - player.x; // camera follows player
+    const playerSpeed = scrollSpeed * 1.05;
+    player.worldX += playerSpeed*dt; // move forward automatically
+    worldX = player.worldX - player.x;
 
-    // physics
-    player.vy += GRAV * dt;
-    player.y += player.vy * dt;
+    player.vy += GRAV*dt;
+    player.y += player.vy*dt;
 
     const gY = groundUnderPlayer();
-    if(gY !== null){
-      const ty = gY - player.h;
-      if(player.y + player.h > ty && player.vy >= 0){ player.y = ty; player.vy = 0; player.grounded = true; }
+    if(gY!==null){
+      const ty=gY-player.h;
+      if(player.y+player.h>ty && player.vy>=0){ player.y=ty; player.vy=0; player.grounded=true; }
     } else { player.grounded=false; if(player.y>H+60) die(); }
 
     if(checkSpikeCollision()) die();
@@ -234,30 +242,25 @@ function render(){
   ctx.save();
   ctx.translate(-worldX,0);
 
-  // draw ground
   for(const seg of segments){
     ctx.fillStyle='#0d9488'; ctx.fillRect(seg.x,seg.y,seg.w,H-seg.y);
     ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(seg.x,seg.y,seg.w,6);
   }
 
-  // draw spikes
   for(const s of spikes){
     ctx.fillStyle='#0b1020';
     const sx=s.x, sy=s.y, sw=s.w, sh=18;
     ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+sw/2,sy-sh); ctx.lineTo(sx+sw,sy); ctx.closePath(); ctx.fill();
   }
 
-  // goal
   ctx.fillStyle='#ffd166';
   ctx.fillRect(levelLength-200,H-80-120,40,120);
 
-  // player
   ctx.fillStyle='#ff3b3b'; ctx.fillRect(player.x,player.y,player.w,player.h);
   ctx.strokeStyle='#00000055'; ctx.lineWidth=2; ctx.strokeRect(player.x,player.y,player.w,player.h);
 
   ctx.restore();
 
-  // progress bar
   const progress=Math.min(1,player.worldX/Math.max(1,levelLength-200));
   ctx.fillStyle='#ffffff22'; ctx.fillRect(20,10,W-40,8);
   ctx.fillStyle='#ffcc33'; ctx.fillRect(20,10,(W-40)*progress,8);
@@ -274,8 +277,7 @@ function fitCanvas(){
 window.addEventListener('resize',fitCanvas);
 fitCanvas();
 
-// --- Start ---
-loadLevel(levelIndex);
+// --- Start loop ---
 requestAnimationFrame(loop);
 
 // dblclick for next level (testing)
