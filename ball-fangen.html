@@ -1,0 +1,191 @@
+!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ball Fangen</title>
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        overflow: hidden;
+        background: #222;
+        color: white;
+    }
+
+    #game-container {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: linear-gradient(#444, #111);
+    }
+
+    #player {
+        position: absolute;
+        bottom: 50px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 60px;
+        background: #00f;
+        border-radius: 10px;
+    }
+
+    .ball {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+    }
+
+    #lives {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-size: 24px;
+    }
+
+    #game-over {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        display: none;
+    }
+
+    #game-over button {
+        margin: 10px;
+        padding: 12px 24px;
+        font-size: 20px;
+        cursor: pointer;
+    }
+</style>
+</head>
+<body>
+<div id="game-container">
+    <div id="player"></div>
+    <div id="lives">Leben: 5</div>
+    <div id="game-over">
+        Game Over!<br>
+        <button id="restart-btn">Neustart</button>
+        <button id="home-btn">Zurück zur Startseite</button>
+    </div>
+</div>
+
+<script>
+const player = document.getElementById('player');
+const livesText = document.getElementById('lives');
+const gameOverScreen = document.getElementById('game-over');
+const restartBtn = document.getElementById('restart-btn');
+const homeBtn = document.getElementById('home-btn');
+
+let lives = 5;
+let gravity = 0.7;
+let jumpPower = 15;
+let isJumping = false;
+let velocityY = 0;
+let moveSpeed = 7;
+let playerPosX = window.innerWidth / 2;
+let currentBall = null;
+let bonusBall = false;
+
+const keys = {};
+
+// Player Bewegung
+document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// Ball erstellen
+function spawnBall() {
+    if(currentBall) return;
+
+    currentBall = document.createElement('div');
+    currentBall.className = 'ball';
+    bonusBall = Math.random() < 0.2; // 20% Chance Bonusball
+    currentBall.style.background = bonusBall ? 'rgba(255,255,0,0.7)' : 'red';
+    currentBall.speed = bonusBall ? 6 : 4; // schneller im Bonuslevel
+    currentBall.style.width = '30px';
+    currentBall.style.height = '30px';
+    currentBall.style.left = Math.random() * (window.innerWidth - 30) + 'px';
+    currentBall.style.top = '0px';
+    document.getElementById('game-container').appendChild(currentBall);
+}
+
+// Ball Bewegung & Kollision
+function updateBall() {
+    if(!currentBall) return;
+
+    let y = parseFloat(currentBall.style.top);
+    y += currentBall.speed;
+    currentBall.style.top = y + 'px';
+
+    const ballRect = currentBall.getBoundingClientRect();
+    const playerRect = player.getBoundingClientRect();
+
+    if(!(playerRect.right < ballRect.left || 
+        playerRect.left > ballRect.right || 
+        playerRect.bottom < ballRect.top || 
+        playerRect.top > ballRect.bottom)) {
+        // Ball gefangen
+        document.getElementById('game-container').removeChild(currentBall);
+        currentBall = null;
+        spawnBall();
+    } else if(y > window.innerHeight) {
+        // Ball durchgefallen
+        lives--;
+        livesText.textContent = "Leben: " + lives;
+        document.getElementById('game-container').removeChild(currentBall);
+        currentBall = null;
+        if(lives <= 0){
+            gameOverScreen.style.display = 'flex';
+        } else {
+            spawnBall();
+        }
+    }
+}
+
+// Player Position
+function updatePlayer() {
+    if(keys['a'] && playerPosX > 0) playerPosX -= moveSpeed;
+    if(keys['d'] && playerPosX < window.innerWidth - player.offsetWidth) playerPosX += moveSpeed;
+    if(keys[' '] && !isJumping) { velocityY = -jumpPower; isJumping = true; }
+
+    // Springen & Gravitation
+    if(isJumping){
+        let bottom = parseFloat(player.style.bottom);
+        bottom += velocityY;
+        velocityY += gravity;
+        if(bottom <= 50){
+            bottom = 50;
+            velocityY = 0;
+            isJumping = false;
+        }
+        player.style.bottom = bottom + 'px';
+    }
+
+    player.style.left = playerPosX + 'px';
+}
+
+// Game Loop
+function gameLoop() {
+    updatePlayer();
+    updateBall();
+    requestAnimationFrame(gameLoop);
+}
+
+// Buttons
+restartBtn.addEventListener('click', () => location.reload());
+homeBtn.addEventListener('click', () => window.location.href = 'index.html');
+
+// Start
+spawnBall();
+gameLoop();
+</script>
+</body>
+</html>
