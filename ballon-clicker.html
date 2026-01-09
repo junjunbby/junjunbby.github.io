@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Balloon Clicker — MVP</title>
+<style>
+  :root{
+    --bg: #f6fbff;
+    --panel: #ffffff;
+    --accent: #ff6bcb;
+    --accent-dark:#e050a8;
+    --muted:#667;
+    --glass: rgba(255,255,255,0.8);
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#e9f7ff 0%, #f6fbff 100%);}
+  .wrap{max-width:1100px;margin:20px auto;padding:18px;display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start;}
+  .game {
+    background: linear-gradient(180deg,#b8ecff 0,#e0fbff 60%);
+    border-radius:12px;
+    min-height:600px;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 10px 30px rgba(20,50,80,0.12);
+    padding:12px;
+  }
+  .hud {
+    position:absolute;left:12px;top:12px;display:flex;gap:12px;align-items:center;z-index:40;
+  }
+  .chip{background:var(--glass);padding:8px 12px;border-radius:999px;font-weight:700;color:#024;}
+  .scoreBig{font-size:20px;color:#053;}
+  .coins{display:flex;flex-direction:column;align-items:flex-end}
+  .coins .small{font-size:12px;color:var(--muted)}
+  .arena{
+    position:absolute;inset:0;pointer-events:auto;
+  }
+  .balloon {
+    position:absolute;
+    width:64px;height:88px;
+    border-radius:50% 50% 48% 48%;
+    transform-origin:center bottom;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    user-select:none;
+    touch-action:manipulation;
+    box-shadow:0 6px 14px rgba(0,0,0,0.12);
+    transition:transform 0.12s ease-out;
+  }
+  .string {
+    position:absolute;
+    left:50%;transform:translateX(-50%);
+    top:78%;height:28px;width:2px;background:rgba(0,0,0,0.12);
+    border-radius:2px;
+  }
+  /* color themes */
+  .b-red{ background: linear-gradient(180deg,#ff8fbf,#ff5ea1); }
+  .b-blue{ background: linear-gradient(180deg,#8fd4ff,#40b7ff); }
+  .b-green{ background: linear-gradient(180deg,#b7ffb7,#53d87a); }
+  .b-yellow{ background: linear-gradient(180deg,#fff29f,#ffd24d); }
+  .b-gold{ background: linear-gradient(180deg,#ffd47a,#ffb200); } /* special */
+  /* floating animation uses CSS custom property for duration/offset */
+  @keyframes floatUp {
+    0% { transform: translateY(var(--start,0)) translateX(0) scale(1); }
+    40% { transform: translateY(calc(var(--start,0) - 24px)) translateX(var(--drift,0px)) scale(1.02); }
+    100% { transform: translateY(calc(var(--start,0) - var(--rise,600px))) translateX(calc(var(--drift,0px)*-1)) scale(1); }
+  }
+  .float {
+    animation-name: floatUp;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    will-change: transform;
+  }
+
+  /* Shop panel */
+  .panel {
+    background:var(--panel);
+    border-radius:12px;
+    padding:14px;
+    box-shadow:0 8px 20px rgba(10,20,40,0.06);
+  }
+  .panel h3{margin:0 0 8px 0;font-size:16px}
+  .upgrades{display:flex;flex-direction:column;gap:10px}
+  .upgrade {
+    display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:8px;background:linear-gradient(180deg,#fff 0,#fbfbff 100%);
+    border:1px solid rgba(0,0,0,0.04);
+  }
+  .upgrade .meta{display:flex;flex-direction:column}
+  .upgrade .cost{font-weight:800;color:#0a6}
+  button.buy {
+    background:var(--accent);border:none;color:white;padding:8px 10px;border-radius:8px;font-weight:700;cursor:pointer;
+    box-shadow:0 6px 12px rgba(224,80,168,0.15);
+  }
+  button.buy:disabled{opacity:0.46;cursor:not-allowed;box-shadow:none}
+  .small{font-size:13px;color:var(--muted)}
+  .controls{display:flex;gap:8px;margin-top:10px;align-items:center}
+
+  /* pop particle */
+  .pop {
+    position:absolute;border-radius:50%;pointer-events:none;will-change:transform,opacity;
+    background:radial-gradient(circle,rgba(255,255,255,0.85) 0,#ffffff00 60%);
+    width:24px;height:24px;opacity:0.95;transform:scale(0);
+  }
+
+  footer{grid-column:span 2;margin-top:8px;text-align:center;color:var(--muted);font-size:13px}
+  @media (max-width:960px){
+    .wrap{grid-template-columns:1fr; padding:12px}
+    footer{grid-column:unset}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="game" id="game">
+      <div class="hud">
+        <div class="chip scoreBig">Balloon Coins: <span id="score">0</span></div>
+        <div class="chip coins"><span class="small">Per Click</span><strong id="perClick">1</strong></div>
+        <div class="chip coins"><span class="small">Auto Pops/sec</span><strong id="autoRate">0</strong></div>
+      </div>
+
+      <div class="arena" id="arena" aria-label="Balloon arena"></div>
+    </div>
+
+    <aside class="panel">
+      <h3>Upgrades</h3>
+      <div class="small">Spend your Balloon Coins to get automated or stronger clicks!</div>
+      <div class="upgrades" id="upgrades">
+        <!-- upgrades inserted by JS -->
+      </div>
+
+      <div class="controls">
+        <button id="saveBtn" class="secondary">Save</button>
+        <button id="resetBtn" class="secondary">Reset</button>
+        <div style="margin-left:auto" class="small">Auto-save: <span id="savedHint">--</span></div>
+      </div>
+    </aside>
+
+    <footer class="small">Balloon Clicker — MVP. Click balloons to pop them. Special gold balloons give more coins. Progress saved locally.</footer>
+  </div>
+
+<script>
+/*
+Balloon Clicker — Single-file MVP
+Features:
+- Click balloons to pop, gain coins.
+- Upgrades: Click Power and Auto-Poppers (auto pops/sec).
+- Balloons spawn and float upwards; different colors and occasional special gold balloon.
+- Simple pop particle and WebAudio pop sound (synth).
+- localStorage persistence for progress.
+*/
+
+/* ---------- State & persistence ---------- */
+const STORAGE_KEY = 'balloon_clicker_v1';
+const DEFAULT_STATE = {
+  coins: 0,
+  clickPowerLevel: 0,  // multiplier applied: 1 + 0.5*level
+  autoPopperCount: 0,
+  totalPopped: 0
+};
+let state = loadState();
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return Object.assign({}, DEFAULT_STATE, JSON.parse(raw));
+  }catch(e){}
+  return Object.assign({}, DEFAULT_STATE);
+}
+function saveState(){
+  state.lastSaved = Date.now();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  document.getElementById('savedHint').textContent = new Date(state.lastSaved).toLocaleTimeString();
+}
+
+/* auto-save */
+setInterval(saveState, 10000);
+
+/* ---------- UI helpers ---------- */
+const scoreEl = document.getElementById('score');
+const perClickEl = document.getElementById('perClick');
+const autoRateEl = document.getElementById('autoRate');
+
+function updateHUD(){
+  scoreEl.textContent = Math.floor(state.coins);
+  perClickEl.textContent = coinsPerClick();
+  autoRateEl.textContent = state.autoPopperCount * AUTO_POP_RATE;
+}
+
+/* ---------- Game config ---------- */
+const ARENA = document.getElementById('arena');
+const MAX_BALLOONS = 18;
+const SPAWN_INTERVAL = 800; // ms
+const BASE_RISE = 540; // px rise distance for animation default
+const AUTO_POP_RATE = 0.5; // each auto-popper causes 0.5 pops per second (tweakable)
+const SPECIAL_CHANCE = 0.08; // chance a spawned balloon is gold special
+const BALLOON_BASE_VALUE = 1;
+
+/* ---------- Upgrades config & UI ---------- */
+const upgradesEl = document.getElementById('upgrades');
+
+const UPGRADES = [
+  {
+    id: 'clickPower',
+    title: 'Click Power',
+    desc: 'Increase coins per click.',
+    baseCost: 12,
+    costMult: 1.65,
+    levelKey: 'clickPowerLevel',
+    onBuy: ()=>{ state.clickPowerLevel += 1; }
+  },
+  {
+    id: 'autoPopper',
+    title: 'Auto-Popper',
+    desc: 'Automatically pop balloons over time.',
+    baseCost: 50,
+    costMult: 1.6,
+    levelKey: 'autoPopperCount',
+    onBuy: ()=>{ state.autoPopperCount += 1; }
+  }
+];
+
+function getUpgradeCost(u){
+  const level = state[u.levelKey] || 0;
+  return Math.ceil(u.baseCost * Math.pow(u.costMult, level));
+}
+
+function renderUpgrades(){
+  upgradesEl.innerHTML = '';
+  UPGRADES.forEach(u=>{
+    const div = document.createElement('div');
+    div.className = 'upgrade';
+    div.innerHTML = `
+      <div class="meta">
+        <div style="font-weight:800">${u.title}</div>
+        <div class="small">${u.desc}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <div class="cost" id="cost-${u.id}">${getUpgradeCost(u)}</div>
+        <button class="buy" id="buy-${u.id}">Buy</button>
+      </div>
+    `;
+    upgradesEl.appendChild(div);
+    const btn = div.querySelector(`#buy-${u.id}`);
+    btn.addEventListener('click', ()=> {
+      const cost = getUpgradeCost(u);
+      if(state.coins >= cost){
+        state.coins -= cost;
+        u.onBuy();
+        playSound('buy');
+        updateHUD();
+        renderUpgrades();
+        saveState();
+      } else {
+        playSound('denied');
+        btn.animate([{ transform:'scale(1)'},{ transform:'scale(0.96)'}, { transform:'scale(1)'}], { duration:220 });
+      }
+    });
+    // disable if not affordable
+    const cost = getUpgradeCost(u);
+    if(state.coins < cost) btn.disabled = true;
+  });
+}
+
+/* ---------- Coins & click power ---------- */
+function coinsPerClick(){
+  // base 1 + 50% per clickPowerLevel
+  return 1 + (state.clickPowerLevel * 0.5);
+}
+
+/* ---------- Balloon spawning & behavior ---------- */
+let spawnTimer = null;
+function startSpawning(){
+  if(spawnTimer) clearInterval(spawnTimer);
+  spawnTimer = setInterval(()=> {
+    const current = ARENA.querySelectorAll('.balloon').length;
+    if(current < MAX_BALLOONS) spawnBalloon();
+  }, SPAWN_INTERVAL);
+}
+function stopSpawning(){ if(spawnTimer) clearInterval(spawnTimer); spawnTimer = null; }
+
+function spawnBalloon(){
+  const b = document.createElement('div');
+  b.className = 'balloon float';
+  // choose color with weighted special chance
+  const isSpecial = Math.random() < SPECIAL_CHANCE;
+  const colorClass = isSpecial ? 'b-gold' : pick(['b-red','b-blue','b-green','b-yellow']);
+  b.classList.add(colorClass);
+  // place horizontally random
+  const arenaW = ARENA.clientWidth;
+  const x = Math.random() * (arenaW - 80) + 20;
+  const startBottom = -20; // start slightly off bottom
+  // set CSS custom properties for animation
+  const rise = BASE_RISE + Math.random()*160 + ARENA.clientHeight*0.5;
+  const duration = 8 + Math.random()*6; // seconds
+  const drift = (Math.random()*40 - 20) + 'px';
+  b.style.left = x + 'px';
+  b.style.bottom = startBottom + 'px';
+  b.style.setProperty('--start', startBottom + 'px');
+  b.style.setProperty('--rise', rise + 'px');
+  b.style.setProperty('--drift', drift);
+  b.style.animationDuration = duration + 's';
+  // assign value and id
+  b.dataset.value = isSpecial ? 6 : BALLOON_BASE_VALUE;
+  b.dataset.special = isSpecial ? '1' : '0';
+  // random scale
+  const s = 0.85 + Math.random()*0.4;
+  b.style.transform = `scale(${s})`;
+  // string
+  const str = document.createElement('div'); str.className = 'string';
+  b.appendChild(str);
+
+  // pointer events
+  b.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    popBalloon(b, 'click');
+  });
+  // auto remove when off-screen (animation end) - but we have infinite animation; instead detect when transform reaches top by animationiteration? Simpler: remove after duration * 1000
+  const removeTimer = setTimeout(()=> {
+    if(b.parentElement) b.remove();
+  }, duration*1000 + 120);
+  b.dataset._removeTimer = removeTimer;
+
+  ARENA.appendChild(b);
+}
+
+/* ---------- Pop logic & particle ---------- */
+function popBalloon(b, source='auto'){
+  if(!b || !b.parentElement) return;
+  const val = parseInt(b.dataset.value || BALLOON_BASE_VALUE, 10);
+  state.coins += val * coinsPerClick() * (source==='click' ? 1 : 1); // auto or click same multiplier for MVP
+  state.totalPopped = (state.totalPopped||0) + 1;
+  updateHUD();
+  // pop animation: scale and fade then remove
+  b.style.transition = 'transform 160ms ease-out, opacity 200ms ease-out';
+  b.style.transform = 'scale(0.1) translateY(-12px)';
+  b.style.opacity = '0';
+  // particle
+  spawnPopEffect(getElementCenter(b), val);
+  playSound('pop');
+  // clear remove timer
+  if(b.dataset._removeTimer) clearTimeout(b.dataset._removeTimer);
+  setTimeout(()=> { b.remove(); saveState(); renderUpgrades(); }, 220);
+}
+
+/* spawn simple expanding circle where balloon popped */
+function spawnPopEffect(pos, value){
+  const el = document.createElement('div');
+  el.className = 'pop';
+  el.style.left = (pos.x - 12) + 'px';
+  el.style.top = (pos.y - 12) + 'px';
+  el.style.background = value > 1 ? 'radial-gradient(circle,#fff3cc,#ffd166)' : 'radial-gradient(circle,#ffffff,#f0f8ff)';
+  document.body.appendChild(el);
+  // animate
+  el.animate([
+    { transform:'scale(0)', opacity:1 },
+    { transform:'scale(1.8)', opacity:0.7, offset:0.6 },
+    { transform:'scale(2.4)', opacity:0 }
+  ], { duration:450, easing:'cubic-bezier(.1,.8,.2,1)'});
+  setTimeout(()=> el.remove(), 520);
+}
+
+function getElementCenter(el){
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width/2, y: r.top + r.height/2 };
+}
+
+/* ---------- Auto-popper logic (pops based on rate) ---------- */
+let autoAccumulator = 0;
+function autoTick(dt){
+  const rate = state.autoPopperCount * AUTO_POP_RATE; // pops per second
+  autoAccumulator += rate * dt;
+  const toDo = Math.floor(autoAccumulator);
+  if(toDo > 0){
+    autoAccumulator -= toDo;
+    for(let i=0;i<toDo;i++){
+      // choose random balloon to pop, else spawn invisible coin
+      const list = ARENA.querySelectorAll('.balloon');
+      if(list.length > 0){
+        const pickIndex = Math.floor(Math.random() * list.length);
+        const b = list[pickIndex];
+        popBalloon(b, 'auto');
+      } else {
+        // no balloon: grant coin directly (simulate pop)
+        state.coins += BALLOON_BASE_VALUE * coinsPerClick();
+      }
+      updateHUD();
+      saveState();
+    }
+  }
+}
+
+/* ---------- Input: click empty arena -> spawn small burst ---------- */
+ARENA.addEventListener('click', (e)=>{
+  // spawn small balloon on click location
+  if(ARENA.querySelectorAll('.balloon').length < MAX_BALLOONS){
+    // spawn at click X and bottom
+    const rect = ARENA.getBoundingClientRect();
+    const x = e.clientX - rect.left - 28;
+    const b = document.createElement('div');
+    b.className = 'balloon float ' + pick(['b-red','b-blue','b-green','b-yellow']);
+    b.style.left = Math.max(8, Math.min(x, ARENA.clientWidth - 88)) + 'px';
+    b.style.bottom = '-22px';
+    const rise = BASE_RISE + Math.random()*120 + ARENA.clientHeight*0.5;
+    b.style.setProperty('--start', '-22px');
+    b.style.setProperty('--rise', rise + 'px');
+    b.style.setProperty('--drift', (Math.random()*40-20)+'px');
+    b.style.animationDuration = (6 + Math.random()*4) + 's';
+    b.dataset.value = BALLOON_BASE_VALUE;
+    b.dataset.special = '0';
+    const str = document.createElement('div'); str.className = 'string'; b.appendChild(str);
+    b.addEventListener('click', (ev)=>{ ev.stopPropagation(); popBalloon(b, 'click'); });
+    ARENA.appendChild(b);
+  }
+});
+
+/* ---------- Utility pick ---------- */
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+/* ---------- Sound system (simple) ---------- */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(kind='pop'){
+  try{
+    const now = audioCtx.currentTime;
+    if(kind==='pop'){
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = 700 + Math.random()*240;
+      g.gain.value = 0.0001;
+      o.connect(g); g.connect(audioCtx.destination);
+      g.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      o.start(now); o.stop(now + 0.2);
+    } else if(kind==='buy'){
+      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      o.type='triangle'; o.frequency.value=480; g.gain.value=0.0001; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.exponentialRampToValueAtTime(0.08, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.14);
+      o.start(now); o.stop(now+0.16);
+    } else if(kind==='denied'){
+      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      o.type='square'; o.frequency.value=220; g.gain.value=0.0001; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.exponentialRampToValueAtTime(0.06, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.18);
+      o.start(now); o.stop(now+0.18);
+    }
+  }catch(e){}
+}
+
+/* ---------- Main loop / spawn & auto tick ---------- */
+let lastFrame = performance.now();
+function loop(now){
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  autoTick(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* start spawning and render upgrades and HUD */
+startSpawning();
+renderUpgrades();
+updateHUD();
+
+/* ---------- Init: show saved time ---------- */
+if(state.lastSaved) document.getElementById('savedHint').textContent = new Date(state.lastSaved).toLocaleTimeString();
+
+/* ---------- Buttons: save & reset ---------- */
+document.getElementById('saveBtn').addEventListener('click', ()=> { saveState(); playSound('buy'); });
+document.getElementById('resetBtn').addEventListener('click', ()=> {
+  if(!confirm('Reset progress?')) return;
+  state = Object.assign({}, DEFAULT_STATE);
+  saveState();
+  updateHUD();
+  renderUpgrades();
+});
+
+/* ---------- Periodic spawn to ensure lively arena ---------- */
+setInterval(()=>{
+  // ensure at least 6 balloons
+  const cur = ARENA.querySelectorAll('.balloon').length;
+  if(cur < 6) spawnBalloon();
+}, 2200);
+
+/* ---------- Accessibility: resume audio on user gesture ---------- */
+window.addEventListener('pointerdown', ()=>{ if(audioCtx.state === 'suspended') audioCtx.resume(); }, { once:true });
+
+/* ---------- End of file ---------- */
+</script>
+</body>
+</html>
