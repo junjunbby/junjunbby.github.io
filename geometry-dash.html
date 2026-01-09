@@ -46,17 +46,7 @@
   </div>
 
 <script>
-/*
-Geometry Dash — MVP (single-file)
-Features:
-- Player cube auto-forwards (world scroll), single-button jump
-- Levels (8) with platforms, gaps, spikes
-- Collision detection (spikes/gaps), level completion, restart
-- Score = distance; highscore persisted
-- Simple sound effects (WebAudio), mobile touch support
-*/
-
-// Canvas setup
+// --- Canvas setup ---
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 let W = canvas.width, H = canvas.height;
@@ -73,7 +63,7 @@ const muteBtn = document.getElementById('muteBtn');
 let muted = false;
 muteBtn.addEventListener('click', ()=>{ muted = !muted; muteBtn.textContent = muted ? 'Unmute' : 'Mute'; });
 
-// Audio
+// Audio helper
 const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function beep(freq=440,duration=0.08,vol=0.12,type='sine'){
   if(muted) return;
@@ -85,390 +75,191 @@ function beep(freq=440,duration=0.08,vol=0.12,type='sine'){
   g.gain.exponentialRampToValueAtTime(0.001, now + duration + 0.01);
   o.start(now); o.stop(now + duration + 0.02);
 }
-window.addEventListener('pointerdown', ()=>{ if(AudioCtx.state === 'suspended') AudioCtx.resume(); }, { once:true });
+window.addEventListener('pointerdown', ()=>{ if(AudioCtx.state==='suspended') AudioCtx.resume(); }, { once:true });
 
-// Game state
+// --- Game state ---
 let running = false;
 let levelIndex = 0;
 let score = 0;
-let high = parseInt(localStorage.getItem('gd_high') || '0', 10);
+let high = parseInt(localStorage.getItem('gd_high')||'0',10);
 highEl.textContent = high;
 
 // Player
-const player = {
-  x: 150, // screen-fixed x for the cube
-  y: 0,
-  w: 34,
-  h: 34,
-  vy: 0,
-  grounded: false
-};
+const player = { x:150, y:0, w:34, h:34, vy:0, grounded:true };
 
 // Camera/world
-let worldX = 0; // how far we've scrolled
-let scrollSpeed = 240; // px/s base, increases with level
+let worldX = 0;
+let scrollSpeed = 240; // base speed
 
 // Physics
-const GRAV = 1600; // px/s^2
-const JUMP_V = 520; // px/s
+const GRAV = 1600;
+const JUMP_V = 520;
 
-// Level definitions (platforms, spikes, length, speed multiplier)
+// --- Levels ---
 const LEVELS = [
-  // Level 1: basic small gaps & spikes
-  {
-    name: 'Stereo Madness',
-    length: 1200,
-    speedMul: 1.0,
-    platforms: [
-      {x:0,w:1200,y:H-80}, // continuous ground with later gaps inserted by omitted segments
-    ],
-    spikes: [ {x:420,w:32}, {x:720,w:32} ],
-    gaps: [ {x:300,w:80}, {x:860,w:100} ]
-  },
-  // Level 2: wider gaps
-  {
-    name: 'Back on Track',
-    length: 1400,
-    speedMul: 1.05,
-    platforms: [{x:0,w:1400,y:H-80}],
-    spikes: [ {x:300,w:32}, {x:680,w:32}, {x:1100,w:32} ],
-    gaps: [ {x:420,w:140}, {x:900,w:160} ]
-  },
-  // Level 3: moving obstacles in full game; here denser spikes
-  {
-    name: 'Polargeist',
-    length: 1600, speedMul:1.08,
-    platforms: [{x:0,w:1600,y:H-80}],
-    spikes: [ {x:320,w:32},{x:480,w:32},{x:760,w:32},{x:980,w:32},{x:1300,w:32} ],
-    gaps: [ {x:600,w:100}, {x:1420,w:90} ]
-  },
-  // Level 4: longer gaps
-  {
-    name: 'Dry Out',
-    length: 1800, speedMul:1.12,
-    platforms: [{x:0,w:1800,y:H-80}],
-    spikes: [ {x:260,w:32},{x:560,w:32},{x:1260,w:32} ],
-    gaps: [ {x:420,w:160}, {x:900,w:160}, {x:1500,w:140} ]
-  },
-  // Level 5: sequences
-  {
-    name: 'Base After Base',
-    length: 2000,speedMul:1.17,
-    platforms: [{x:0,w:2000,y:H-80}],
-    spikes: [ {x:400,w:32},{x:440,w:32},{x:480,w:32},{x:920,w:32},{x:960,w:32} ],
-    gaps: [ {x:700,w:120}, {x:1320,w:140} ]
-  },
-  // Level 6: quick sequences
-  {
-    name: 'Cant Let Go',
-    length: 2200,speedMul:1.22,
-    platforms: [{x:0,w:2200,y:H-80}],
-    spikes: [ {x:300,w:32},{x:460,w:32},{x:620,w:32},{x:900,w:32},{x:1500,w:32}],
-    gaps: [ {x:1050,w:120},{x:1800,w:120} ]
-  },
-  // Level 7: consecutive jumps
-  {
-    name: 'Jumper',
-    length: 2400,speedMul:1.28,
-    platforms: [{x:0,w:2400,y:H-80}],
-    spikes: [ {x:350,w:32},{x:500,w:32},{x:650,w:32},{x:1000,w:32},{x:1400,w:32}],
-    gaps: [ {x:760,w:90},{x:1180,w:110},{x:1980,w:120} ]
-  },
-  // Level 8: faster, complex patterns
-  {
-    name: 'Time Machine',
-    length: 2800,speedMul:1.36,
-    platforms: [{x:0,w:2800,y:H-80}],
-    spikes: [ {x:260,w:32},{x:420,w:32},{x:580,w:32},{x:860,w:32},{x:1220,w:32},{x:1700,w:32},{x:2140,w:32}],
-    gaps: [ {x:700,w:140},{x:1500,w:160},{x:2400,w:160} ]
-  }
+  { name:'Stereo Madness', length:1200, speedMul:1, platforms:[{x:0,w:1200,y:H-80}], spikes:[{x:420,w:32},{x:720,w:32}], gaps:[{x:300,w:80},{x:860,w:100}] },
+  { name:'Back on Track', length:1400, speedMul:1.05, platforms:[{x:0,w:1400,y:H-80}], spikes:[{x:300,w:32},{x:680,w:32},{x:1100,w:32}], gaps:[{x:420,w:140},{x:900,w:160}] },
+  { name:'Polargeist', length:1600, speedMul:1.08, platforms:[{x:0,w:1600,y:H-80}], spikes:[{x:320,w:32},{x:480,w:32},{x:760,w:32},{x:980,w:32},{x:1300,w:32}], gaps:[{x:600,w:100},{x:1420,w:90}] },
+  { name:'Dry Out', length:1800, speedMul:1.12, platforms:[{x:0,w:1800,y:H-80}], spikes:[{x:260,w:32},{x:560,w:32},{x:1260,w:32}], gaps:[{x:420,w:160},{x:900,w:160},{x:1500,w:140}] },
+  { name:'Base After Base', length:2000,speedMul:1.17, platforms:[{x:0,w:2000,y:H-80}], spikes:[{x:400,w:32},{x:440,w:32},{x:480,w:32},{x:920,w:32},{x:960,w:32}], gaps:[{x:700,w:120},{x:1320,w:140}] },
+  { name:'Cant Let Go', length:2200,speedMul:1.22, platforms:[{x:0,w:2200,y:H-80}], spikes:[{x:300,w:32},{x:460,w:32},{x:620,w:32},{x:900,w:32},{x:1500,w:32}], gaps:[{x:1050,w:120},{x:1800,w:120}] },
+  { name:'Jumper', length:2400,speedMul:1.28, platforms:[{x:0,w:2400,y:H-80}], spikes:[{x:350,w:32},{x:500,w:32},{x:650,w:32},{x:1000,w:32},{x:1400,w:32}], gaps:[{x:760,w:90},{x:1180,w:110},{x:1980,w:120}] },
+  { name:'Time Machine', length:2800,speedMul:1.36, platforms:[{x:0,w:2800,y:H-80}], spikes:[{x:260,w:32},{x:420,w:32},{x:580,w:32},{x:860,w:32},{x:1220,w:32},{x:1700,w:32},{x:2140,w:32}], gaps:[{x:700,w:140},{x:1500,w:160},{x:2400,w:160}] }
 ];
 
-// Build runtime platform segments that remove gaps
+// --- Build runtime platforms/spikes ---
 function buildSegments(level){
-  const basePlatforms = [];
+  const base = [];
   for(const p of level.platforms){
-    // start at p.x, break into segments excluding gaps
-    let cursor = p.x;
-    const end = p.x + p.w;
-    // get gaps in this span
-    const gaps = (level.gaps || []).filter(g => g.x < end && (g.x + g.w) > cursor).sort((a,b)=>a.x-b.x);
-    for(const g of gaps){
-      if(g.x > cursor) basePlatforms.push({x:cursor, w: g.x - cursor, y: p.y});
-      cursor = Math.max(cursor, g.x + g.w);
-    }
-    if(cursor < end) basePlatforms.push({x:cursor, w: end - cursor, y: p.y});
+    let cursor=p.x, end=p.x+p.w;
+    const gaps=(level.gaps||[]).filter(g=>g.x<end && g.x+g.w>cursor).sort((a,b)=>a.x-b.x);
+    for(const g of gaps){ if(g.x>cursor) base.push({x:cursor,w:g.x-cursor,y:p.y}); cursor=Math.max(cursor,g.x+g.w);}
+    if(cursor<end) base.push({x:cursor,w:end-cursor,y:p.y});
   }
-  return basePlatforms;
+  return base;
 }
-
-// Generate spike shapes (triangles) at their positions on top of ground
 function buildSpikes(level){
-  // spikes defined where their x is; find platform y at that x
-  const spikes = [];
-  const segs = buildSegments(level);
+  const spikes=[];
+  const segs=buildSegments(level);
   for(const s of level.spikes){
-    // find segment under spike
-    const seg = segs.find(seg => s.x >= seg.x && s.x <= seg.x + seg.w);
-    if(seg) spikes.push({x:s.x, w:s.w, y: seg.y});
-    else {
-      // if no platform, place spike at baseline
-      const base = level.platforms[0].y;
-      spikes.push({x:s.x, w:s.w, y: base});
-    }
+    const seg=segs.find(seg=>s.x>=seg.x && s.x<=seg.x+seg.w);
+    spikes.push({x:s.x, w:s.w, y: seg ? seg.y : level.platforms[0].y});
   }
   return spikes;
 }
 
-// Game runtime variables
-let currentLevel = null;
-let segments = [];
-let spikes = [];
-let levelLength = 0;
+// --- Game runtime ---
+let currentLevel=null, segments=[], spikes=[];
+let levelLength=0;
 
-// Initialize level
 function loadLevel(i){
-  levelIndex = Math.max(0, Math.min(i, LEVELS.length - 1));
-  currentLevel = LEVELS[levelIndex];
-  levelLabel.textContent = `Level ${levelIndex+1}: ${currentLevel.name}`;
-  levelLength = currentLevel.length;
-  scrollSpeed = 220 * currentLevel.speedMul;
-  segments = buildSegments(currentLevel);
-  spikes = buildSpikes(currentLevel);
-  worldX = 0;
-  player.y = H - 80 - player.h;
-  player.vy = 0;
-  player.grounded = true;
-  score = 0;
+  levelIndex=Math.max(0,Math.min(i,LEVELS.length-1));
+  currentLevel=LEVELS[levelIndex];
+  levelLabel.textContent=`Level ${levelIndex+1}: ${currentLevel.name}`;
+  levelLength=currentLevel.length;
+  scrollSpeed=220*currentLevel.speedMul;
+  segments=buildSegments(currentLevel);
+  spikes=buildSpikes(currentLevel);
+  worldX=0;
+  player.y=H-80-player.h;
+  player.vy=0;
+  player.grounded=true;
+  score=0;
   updateUI('Ready');
 }
 
-// Start / restart
-startBtn.addEventListener('click', ()=>{
-  // reset player and start
-  loadLevel(levelIndex);
-  running = true;
-  statusEl.textContent = 'Running';
-});
+startBtn.addEventListener('click', ()=>{ loadLevel(levelIndex); running=true; statusEl.textContent='Running'; });
+nextBtn.addEventListener('click', ()=>{ loadLevel(levelIndex+1); running=false; statusEl.textContent='Loaded'; });
 
-// Next level button
-nextBtn.addEventListener('click', ()=>{
-  loadLevel(levelIndex + 1);
-  running = false;
-  statusEl.textContent = 'Loaded';
-});
+// --- Input ---
+function doJump(){ if(!running) return; if(player.grounded){ player.vy=-JUMP_V; player.grounded=false; beep(840,0.08,0.12,'square'); } }
+window.addEventListener('keydown', e=>{ if(['Space','ArrowUp','KeyW'].includes(e.code)){ e.preventDefault(); doJump(); } });
+canvas.addEventListener('mousedown', doJump);
+canvas.addEventListener('touchstart', e=>{ doJump(); e.preventDefault(); }, {passive:false});
 
-// Input handling (space or click)
-function doJump(){
-  if(!running) return;
-  if(player.grounded){
-    player.vy = -JUMP_V;
-    player.grounded = false;
-    beep(840,0.08,0.12,'square');
-  }
-}
-window.addEventListener('keydown', (e)=>{
-  if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW'){ e.preventDefault(); doJump(); }
-});
-canvas.addEventListener('mousedown', (e)=>{ doJump(); });
-canvas.addEventListener('touchstart', (e)=>{ doJump(); e.preventDefault(); }, {passive:false});
-
-// Basic collision helper: check if player collides with any spike
+// --- Collision ---
 function checkSpikeCollision(){
-  // compute player's world x
-  const px = player.x + worldX;
-  const py = player.y;
+  const px=player.x+worldX, py=player.y;
   for(const s of spikes){
-    // spike bounding box
-    const sx = s.x, sw = s.w, sy = s.y;
-    const sTop = sy - 12; // spike height approx
-    if(px + player.w > sx && px < sx + sw){
-      // if player's feet are below spike tip (i.e., intersect)
-      if(player.y + player.h > sTop){
-        return true;
-      }
-    }
+    const sx=s.x, sw=s.w, sy=s.y, sTop=sy-18;
+    if(px+player.w>sx && px<sx+sw && py+player.h>sTop) return true;
   }
   return false;
 }
-
-// Check if player is over ground (any segment that covers its world x foot position)
 function groundUnderPlayer(){
-  const px = player.x + worldX;
-  // check for a segment whose range covers player's feet x
-  for(const seg of segments){
-    if(px + player.w/2 >= seg.x && px + player.w/2 <= seg.x + seg.w){
-      return seg.y;
-    }
-  }
+  const px=player.x+worldX;
+  for(const seg of segments){ if(px+player.w/2 >= seg.x && px+player.w/2 <= seg.x+seg.w) return seg.y; }
   return null;
 }
 
-// Update UI
-function updateScoreUI(){
-  scoreEl.textContent = Math.floor(score);
-  highEl.textContent = high;
-}
+// --- UI ---
+function updateUI(status){ statusEl.textContent=status; updateScoreUI(); }
+function updateScoreUI(){ scoreEl.textContent=Math.floor(score); highEl.textContent=high; }
 
-// Game loop
-let last = performance.now();
+// --- Game loop ---
+let last=performance.now();
 function loop(now){
-  const dt = Math.min(0.033, (now - last) / 1000); // cap dt
-  last = now;
+  const dt=Math.min(0.033,(now-last)/1000); last=now;
   if(running){
-    // advance world scroll
-    worldX += scrollSpeed * dt;
-    score += scrollSpeed * dt * 0.02; // scale to reasonable score
-    // player physics (vy affected by gravity)
-    player.vy += GRAV * dt;
-    player.y += player.vy * dt;
-
-    // ground collision: if below ground segment, snap
-    const gY = groundUnderPlayer();
-    if(gY !== null){
-      const targetY = gY - player.h;
-      if(player.y + player.h > targetY && player.vy >= 0){
-        // land
-        player.y = targetY;
-        player.vy = 0;
-        player.grounded = true;
-      }
-    } else {
-      // no ground under -> falling into gap; if too low -> die
-      player.grounded = false;
-      if(player.y > H + 60){
-        // died by falling
-        die();
-      }
-    }
-
-    // spike collision
-    if(checkSpikeCollision()){
-      die();
-    }
-
-    // level completion
-    if(worldX >= levelLength - 200){
-      // finished
-      running = false;
-      statusEl.textContent = 'Complete!';
-      beep(1200, 0.2, 0.18, 'sine');
-      // award bonus and update highscore
-      if(score > high){ high = Math.floor(score); localStorage.setItem('gd_high', high); }
-      updateScoreUI();
-    }
-
+    worldX+=scrollSpeed*dt; score+=scrollSpeed*dt*0.02;
+    player.vy+=GRAV*dt; player.y+=player.vy*dt;
+    const gY=groundUnderPlayer();
+    if(gY!==null){ const ty=gY-player.h; if(player.y+player.h>ty && player.vy>=0){ player.y=ty; player.vy=0; player.grounded=true; } }
+    else { player.grounded=false; if(player.y>H+60) die(); }
+    if(checkSpikeCollision()) die();
+    if(worldX>=levelLength-200){ running=false; statusEl.textContent='Complete!'; beep(1200,0.2,0.18,'sine'); if(score>high){ high=Math.floor(score); localStorage.setItem('gd_high',high); } updateScoreUI(); }
     updateScoreUI();
   }
-
   render();
   requestAnimationFrame(loop);
 }
 
-// Death handling
-function die(){
-  running = false;
-  statusEl.textContent = 'Game Over';
-  beep(160, 0.25, 0.18, 'sawtooth');
-  // update highscore
-  if(Math.floor(score) > high){ high = Math.floor(score); localStorage.setItem('gd_high', high); }
-  updateScoreUI();
-}
+// --- Death ---
+function die(){ running=false; statusEl.textContent='Game Over'; beep(160,0.25,0.18,'sawtooth'); if(Math.floor(score)>high){ high=Math.floor(score); localStorage.setItem('gd_high',high); } updateScoreUI(); }
 
-// Render function
+// --- Render ---
 function render(){
-  // clear
   ctx.clearRect(0,0,W,H);
-  // background gradient (simple parallax)
-  ctx.fillStyle = '#7fd3ff';
-  ctx.fillRect(0,0,W,H);
-  // clouds / bg decorative
-  ctx.globalAlpha = 0.2;
+  ctx.fillStyle='#7fd3ff'; ctx.fillRect(0,0,W,H);
+
+  // clouds
+  ctx.globalAlpha=0.2;
   for(let i=0;i<5;i++){
-    const cx = ((i*330 - worldX*0.2) % (W + 200)) - 100;
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.ellipse(cx + 60, 60 + i*8, 60, 20, 0, 0, Math.PI*2);
-    ctx.fill();
+    const cx=((i*330 - worldX*0.2)%(W+200))-100;
+    ctx.fillStyle='#ffffff';
+    ctx.beginPath(); ctx.ellipse(cx+60,60+i*8,60,20,0,0,Math.PI*2); ctx.fill();
   }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha=1;
 
-  // translate world
   ctx.save();
-  ctx.translate(-worldX, 0);
+  ctx.translate(-worldX,0);
 
-  // draw segments (ground)
-  ctx.fillStyle = '--'; // just to ensure later override
+  // draw ground
   for(const seg of segments){
-    ctx.fillStyle = '#0d9488';
-    ctx.fillRect(seg.x, seg.y, seg.w, H - seg.y);
-    // top highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.fillRect(seg.x, seg.y, seg.w, 6);
+    ctx.fillStyle='#0d9488'; ctx.fillRect(seg.x,seg.y,seg.w,H-seg.y);
+    ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(seg.x,seg.y,seg.w,6);
   }
 
   // draw spikes
   for(const s of spikes){
-    ctx.fillStyle = '#0b1020';
-    const sx = s.x, sy = s.y, sw = s.w, sh = 18;
-    // draw a triangle
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx + sw/2, sy - sh);
-    ctx.lineTo(sx + sw, sy);
-    ctx.closePath();
-    ctx.fill();
+    ctx.fillStyle='#0b1020';
+    const sx=s.x, sy=s.y, sw=s.w, sh=18;
+    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+sw/2,sy-sh); ctx.lineTo(sx+sw,sy); ctx.closePath(); ctx.fill();
   }
 
-  // draw goal
-  ctx.fillStyle = '#ffd166';
-  ctx.fillRect(levelLength - 200, H - 80 - 120, 40, 120);
+  // goal
+  ctx.fillStyle='#ffd166';
+  ctx.fillRect(levelLength-200,H-80-120,40,120);
 
-  // draw player (cube) at fixed screen x but world translated already
-  ctx.fillStyle = '#ff3b3b';
-  ctx.fillRect(player.x, player.y, player.w, player.h);
-
-  // draw outline
-  ctx.strokeStyle = '#00000055';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(player.x, player.y, player.w, player.h);
+  // player
+  ctx.fillStyle='#ff3b3b'; ctx.fillRect(player.x,player.y,player.w,player.h);
+  ctx.strokeStyle='#00000055'; ctx.lineWidth=2; ctx.strokeRect(player.x,player.y,player.w,player.h);
 
   ctx.restore();
 
-  // HUD (draw a simple progress bar)
-  const progress = Math.min(1, worldX / Math.max(1, levelLength - 200));
-  ctx.fillStyle = '#ffffff22';
-  ctx.fillRect(20, 10, W - 40, 8);
-  ctx.fillStyle = '#ffcc33';
-  ctx.fillRect(20, 10, (W - 40) * progress, 8);
+  // progress bar
+  const progress=Math.min(1,worldX/Math.max(1,levelLength-200));
+  ctx.fillStyle='#ffffff22'; ctx.fillRect(20,10,W-40,8);
+  ctx.fillStyle='#ffcc33'; ctx.fillRect(20,10,(W-40)*progress,8);
 }
 
-// Resize handling for responsiveness
+// --- Resize ---
 function fitCanvas(){
-  const ratio = 16/5;
-  const maxW = Math.min(window.innerWidth - 80, 960);
-  let cw = maxW;
-  let ch = Math.round(cw / ratio);
-  if(ch > window.innerHeight - 220){
-    ch = window.innerHeight - 220;
-    cw = Math.round(ch * ratio);
-  }
-  canvas.style.width = cw + 'px';
-  canvas.style.height = ch + 'px';
+  const ratio=16/5;
+  const maxW=Math.min(window.innerWidth-80,960);
+  let cw=maxW, ch=Math.round(cw/ratio);
+  if(ch>window.innerHeight-220){ ch=window.innerHeight-220; cw=Math.round(ch*ratio); }
+  canvas.style.width=cw+'px'; canvas.style.height=ch+'px';
 }
-window.addEventListener('resize', fitCanvas);
+window.addEventListener('resize',fitCanvas);
 fitCanvas();
 
-// Start with level 0 loaded
-let levelIndex = 0;
+// --- Start ---
 loadLevel(levelIndex);
 requestAnimationFrame(loop);
 
-// Touch support: allow tapping anywhere to jump
-canvas.addEventListener('touchstart', (e)=>{ doJump(); e.preventDefault(); }, {passive:false});
-
-// expose next level on double-click for testing
-canvas.addEventListener('dblclick', ()=>{ loadLevel(levelIndex+1); });
+// dblclick for next level (testing)
+canvas.addEventListener('dblclick',()=>{ loadLevel(levelIndex+1); });
 
 </script>
 </body>
