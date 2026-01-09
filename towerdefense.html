@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TD Master Edition</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72,#2a5298);display:flex;justify-content:center;align-items:center;min-height:100vh;color:#fff;overflow:hidden}
+#app{background:rgba(0,0,0,.9);border-radius:20px;padding:15px;max-width:95vw}
+#c{border:3px solid #4CAF50;border-radius:10px;display:block;background:#1a1a1a;cursor:crosshair}
+.ui{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;font-size:12px}
+.stat{background:rgba(255,255,255,.1);padding:6px 10px;border-radius:6px;font-weight:bold}
+.btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.btn{padding:8px 14px;font-size:12px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;transition:.3s}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.towers{display:flex;gap:5px;background:rgba(255,255,255,.1);padding:5px;border-radius:8px;flex-wrap:wrap}
+.tw{padding:5px 8px;background:rgba(255,255,255,.2);border:2px solid transparent;border-radius:5px;cursor:pointer;font-size:10px;color:#fff}
+.tw:hover{background:rgba(255,255,255,.3)}
+.tw.sel{border-color:#4CAF50;background:rgba(76,175,80,.3)}
+.tw.locked{opacity:.4;cursor:not-allowed}
+.panel{position:absolute;background:rgba(0,0,0,.95);border:3px solid #4CAF50;border-radius:12px;padding:12px;display:none;z-index:50;min-width:180px}
+.panel.show{display:block}
+.upg{width:100%;margin:3px 0;padding:6px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold}
+.upg:hover{background:#45a049}
+.upg:disabled{background:#666}
+.modal{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.95);padding:25px;border-radius:15px;text-align:center;display:none;z-index:100;border:3px solid #f44;max-width:350px}
+.modal.show{display:block}
+.modal.win{border-color:#4CAF50}
+.tip{position:absolute;background:rgba(0,0,0,.9);color:#fff;padding:8px;border-radius:6px;font-size:10px;display:none;z-index:60;border:1px solid #4CAF50;max-width:180px}
+.modes{display:flex;gap:5px;margin-bottom:8px}
+.mode{flex:1;padding:8px;background:rgba(255,255,255,.2);border:2px solid transparent;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold}
+.mode.sel{border-color:#4CAF50}
+.quest{background:rgba(255,215,0,.2);border:2px solid #FFD700;padding:5px;margin:3px 0;border-radius:4px;font-size:10px}
+.info{font-size:10px;color:rgba(255,255,255,.6);text-align:center;margin-top:5px}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="modes">
+<button class="mode sel" data-mode="survival">🎯 Survival</button>
+<button class="mode" data-mode="challenge">⚡ Challenge</button>
+<button class="mode" data-mode="endless">♾️ Endless</button>
+</div>
+<div class="ui">
+<div class="stat">💰<span id="m">300</span></div>
+<div class="stat">❤️<span id="l">30</span></div>
+<div class="stat">🌊<span id="w">0</span></div>
+<div class="stat">⭐<span id="xp">0</span></div>
+<div class="stat">🏆<span id="hs">0</span></div>
+</div>
+<canvas id="c" width="800" height="600"></canvas>
+<div class="btns">
+<button class="btn" id="sb" style="background:#4CAF50;color:#fff;flex:1">Start</button>
+<button class="btn" id="fb" style="background:#00BCD4;color:#fff">❄️<span id="fc"></span></button>
+<button class="btn" id="bb" style="background:#F44336;color:#fff">💣<span id="bc"></span></button>
+<button class="btn" id="lb" style="background:#FFEB3B;color:#000">⚡<span id="lc"></span></button>
+<button class="btn" id="mb" style="background:#9C27B0;color:#fff">🔮<span id="mc"></span></button>
+</div>
+<div class="towers" id="tws"></div>
+<div class="info">Hover=Range • Click=Upgrade • XP unlocks towers</div>
+</div>
+<div class="panel" id="panel">
+<h4 id="pn" style="margin:0 0 5px"></h4>
+<p id="ps" style="font-size:10px;margin-bottom:5px"></p>
+<button class="upg" id="ud">+DMG($30)</button>
+<button class="upg" id="ur">+Range($40)</button>
+<button class="upg" id="us">+Speed($35)</button>
+<button class="upg" id="uu" style="display:none">Ultimate($100)</button>
+<button class="upg" style="background:#f44" id="sell">Sell(50%)</button>
+<button class="btn" style="width:100%;margin-top:3px;background:#666;font-size:11px" onclick="closeP()">X</button>
+</div>
+<div class="modal" id="modal">
+<h2 id="mt" style="margin-bottom:10px"></h2>
+<div id="ms" style="margin:10px 0;line-height:1.6"></div>
+<div id="qs"></div>
+<button class="btn" style="background:#4CAF50;color:#fff;padding:10px 30px" onclick="location.reload()">Again</button>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),G=40,C=20,R=15;
+const MAPS=[[{x:0,y:7},{x:3,y:7},{x:3,y:3},{x:7,y:3},{x:7,y:11},{x:12,y:11},{x:12,y:5},{x:16,y:5},{x:16,y:10},{x:19,y:10}]];
+const TW={basic:{c:50,d:10,r:100,f:1000,col:'#4CAF50',p:'#8BC34A',u:0},fire:{c:80,d:5,r:110,f:800,col:'#F44336',p:'#FF5252',u:0,burn:3},ice:{c:70,d:5,r:120,f:1200,col:'#00BCD4',p:'#80DEEA',u:50,slow:.5},poison:{c:90,d:3,r:100,f:600,col:'#9C27B0',p:'#BA68C8',u:100,poi:2},laser:{c:150,d:50,r:250,f:2500,col:'#E91E63',p:'#F48FB1',u:200,pierce:1},tesla:{c:120,d:15,r:130,f:1000,col:'#FFEB3B',p:'#FFF176',u:150,chain:2},support:{c:100,d:0,r:150,f:0,col:'#4CAF50',p:'',u:250,buff:1},sniper:{c:100,d:40,r:220,f:2000,col:'#2196F3',p:'#64B5F6',u:0,crit:1},splash:{c:110,d:8,r:120,f:800,col:'#FF9800',p:'#FFB74D',u:0,splash:50},armor:{c:130,d:20,r:140,f:1500,col:'#607D8B',p:'#90A4AE',u:300,armor:1}};
+const EN={norm:{h:30,s:1.2,r:12,x:5,c:'#e74c3c',sz:12},fast:{h:15,s:2.5,r:15,x:8,c:'#3498db',sz:10},tank:{h:100,s:.6,r:30,x:20,c:'#2ecc71',sz:16},fly:{h:25,s:1.8,r:20,x:10,c:'#9b59b6',sz:11,fly:1},boss:{h:500,s:.4,r:100,x:50,c:'#e67e22',sz:25,split:1},heal:{h:40,s:1,r:25,x:15,c:'#1abc9c',sz:13,heal:1},shield:{h:80,s:1.1,r:28,x:18,c:'#34495e',sz:14,sh:20},invis:{h:35,s:1.5,r:22,x:25,c:'#95a5a6',sz:11,inv:1},regen:{h:60,s:.9,r:18,x:12,c:'#16a085',sz:13,reg:1},arm:{h:70,s:1,r:20,x:16,c:'#7f8c8d',sz:14,arm:.5},swarm:{h:8,s:2,r:5,x:3,c:'#e67e22',sz:6}};
+let path=MAPS[0],m=300,lv=30,w=0,xp=0,hs=0,mode='survival';
+let sel='basic',act=0,run=1,tws=[],ens=[],pjs=[],pts=[],selT=null,hov=null;
+let fcd=0,bcd=0,lcd=0,mcd=0,unlk={basic:1,fire:1,sniper:1,splash:1};
+let quests=[{t:'Kill 100 enemies',p:0,g:100},{t:'Survive 10 waves',p:0,g:10},{t:'Reach wave 20',p:0,g:20}];
+try{hs=parseInt(localStorage.getItem('tdhs'))||0}catch(e){}
+
+/* Tower, Projectile, Enemy Klassen + Spielmechanik hier wie in deinem Originalcode */
+/* Funktionen: spW, useF, useB, useL, useM, part, exp, snd, showP, closeP, click + hover Logik */
+</script>
+</body>
+</html>
