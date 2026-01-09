@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pixel-Miner — Prototyp</title>
+  <!-- Pixel font -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f1720;
+      --panel:#121826;
+      --accent:#FFD36E;
+      --ui-text:#E6EEF8;
+      --tile-size:32px; /* integer scale for pixel look */
+      --gap:8px;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(#0b1220,#081018);font-family:'Press Start 2P',monospace;color:var(--ui-text);-webkit-font-smoothing:antialiased}
+    .app{display:flex;gap:var(--gap);height:100%;padding:20px;box-sizing:border-box;}
+    /* Left inventory, center canvas, right upgrades */
+    .panel{background:linear-gradient(#0f1726,#0c151e);border:2px solid rgba(255,255,255,0.04);padding:12px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.6);}
+    .left{width:190px;display:flex;flex-direction:column;gap:10px}
+    .center{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px}
+    .right{width:220px;display:flex;flex-direction:column;gap:10px}
+    .topbar{display:flex;justify-content:space-between;align-items:center;width:100%;padding:8px 12px;background:linear-gradient(180deg,#0b1a2a,#071220);border-radius:6px;border:1px solid rgba(255,255,255,0.03)}
+    .topbar .left,.topbar .right{display:flex;gap:10px;align-items:center}
+    .coin{display:flex;gap:8px;align-items:center}
+    .stat{font-size:12px;color:var(--ui-text)}
+    .xpbar{width:160px;height:8px;background:#06202e;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.03)}
+    .xpfill{height:100%;background:linear-gradient(90deg,#6ee7b7,#7ad0ff)}
+    /* Inventory grid */
+    .inv-title{font-size:12px;margin-bottom:6px}
+    .inventory{display:grid;grid-template-columns:repeat(4,46px);grid-auto-rows:46px;gap:6px;background:linear-gradient(#07121a,#061018);padding:8px;border-radius:6px}
+    .inv-slot{width:46px;height:46px;background:#0b1622;border-radius:4px;border:1px solid rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center;position:relative}
+    .inv-slot .icon{width:28px;height:28px;border-radius:3px;box-shadow:inset 0 -2px rgba(0,0,0,0.4)}
+    .inv-count{position:absolute;right:4px;bottom:4px;font-size:10px}
+    /* Upgrades */
+    .upgrade{background:linear-gradient(#081220,#061218);padding:8px;border-radius:6px;display:flex;flex-direction:column;gap:8px}
+    .up-btn{background:#09202c;border-radius:6px;padding:8px;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+    .up-btn.disabled{opacity:0.45;cursor:not-allowed}
+    .small{font-size:11px;color:#BFD8E8}
+    /* Canvas wrapper */
+    .game-wrap{background:linear-gradient(#08202a,#06161b);padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)}
+    canvas{image-rendering:pixelated;border:4px solid rgba(255,255,255,0.02);display:block;background:linear-gradient(#9fd8ff 0%, #6fb9ff 100%)}
+    /* Footer/context */
+    .info{font-size:11px;color:#b7d5e6;padding:6px 8px;background:#071722;border-radius:6px;border:1px solid rgba(255,255,255,0.03)}
+    /* Buttons */
+    .btn{background:linear-gradient(#135b88,#0b4b78);padding:8px;border-radius:6px;text-align:center;color:white;cursor:pointer;border:1px solid rgba(255,255,255,0.06)}
+    .tiny{font-size:11px;padding:6px;border-radius:4px}
+    /* Responsive */
+    @media (max-width:900px){
+      .app{flex-direction:column;align-items:stretch}
+      .left,.right{width:100%;flex-direction:row;justify-content:space-between}
+      .inventory{grid-template-columns:repeat(8,40px)}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- LEFT: Inventory -->
+    <div class="panel left">
+      <div class="inv-title">INVENTAR</div>
+      <div class="inventory" id="inventory">
+        <!-- slots dynamically filled -->
+      </div>
+      <div class="info" id="inv-hint">Sammle Ressourcen durch Graben. Klick Block → Miner gräbt.</div>
+    </div>
+
+    <!-- CENTER: Game -->
+    <div class="panel center">
+      <div class="topbar" style="width:760px;max-width:calc(100vw - 460px);">
+        <div class="left coin">
+          <div style="width:18px;height:18px;border-radius:4px;background:gold;box-shadow:0 1px 0 rgba(255,255,255,0.2)"></div>
+          <div>
+            <div style="font-size:12px">Geld</div>
+            <div id="money" class="stat">0</div>
+          </div>
+        </div>
+        <div class="right">
+          <div style="text-align:right">
+            <div style="font-size:12px">Level</div>
+            <div id="level" class="stat">1</div>
+            <div class="xpbar" title="XP">
+              <div id="xpfill" class="xpfill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-wrap">
+        <!-- Canvas -->
+        <canvas id="game" width="640" height="512"></canvas>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <div class="btn tiny" id="sellAll">SELL ALL</div>
+        <div class="btn tiny" id="toggleAuto">Toggle Auto-Miner</div>
+        <div class="btn tiny" id="reset">Reset</div>
+      </div>
+
+      <div class="info" id="context">Klicke auf einen Block, um zu graben. Tiefere Schichten = wertvollere Ressourcen.</div>
+    </div>
+
+    <!-- RIGHT: Upgrades -->
+    <div class="panel right">
+      <div style="font-size:12px;margin-bottom:6px">UPGRADES</div>
+      <div class="upgrade">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px">Spitzhacke</div>
+            <div class="small">Erhöht Mining-Power</div>
+          </div>
+          <div id="pickLevel" class="small">Lv.1</div>
+        </div>
+        <div id="upgradePick" class="up-btn">
+          <div class="small">Upgrade</div>
+          <div id="pickCost" class="small">Kosten: 50</div>
+        </div>
+
+        <hr style="border:0;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px">Auto‑Miner</div>
+            <div class="small">Kauft Roboter, die automatisch graben</div>
+          </div>
+          <div id="autoCount" class="small">0</div>
+        </div>
+        <div id="buyAuto" class="up-btn">
+          <div class="small">Kaufen</div>
+          <div id="autoCost" class="small">Kosten: 200</div>
+        </div>
+
+        <hr style="border:0;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px">Inventar +1</div>
+            <div class="small">Erhöht Inventar‑Slots</div>
+          </div>
+          <div id="invSlots" class="small">16</div>
+        </div>
+        <div id="buyInv" class="up-btn">
+          <div class="small">Kaufen</div>
+          <div id="invCost" class="small">Kosten: 150</div>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;font-size:12px">Tip: Für kurze Sessions (2–5 min) optimieren.</div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================
+    // Pixel-Miner Prototyp (DE)
+    // Implementiert: Minegrid, Miner-Animation, Ressourcen, Inventar, Upgrades, Auto-Miner, Simple Particles
+    // ==========================
+    /* CONFIG */
+    const TILE = 32; // pixel size (integer scale)
+    const COLS = 20;
+    const ROWS = 16;
+    const CANVAS_W = COLS * TILE; // 640
+    const CANVAS_H = ROWS * TILE; // 512
+
+    // Resource definitions (colors, base value, base HP)
+    const RESOURCES = [
+      { id: 'empty', color: '#00000000', name: 'Leer', baseHp:0, value:0, rarity:0 }, // empty
+      { id: 'stone', color: '#9E9E9E', name: 'Stein', baseHp:1, value:1, rarity:0.5 },
+      { id: 'coal', color: '#2B2B2B', name: 'Kohle', baseHp:2, value:3, rarity:0.35 },
+      { id: 'iron', color: '#7B6A4F', name: 'Eisen', baseHp:4, value:10, rarity:0.2 },
+      { id: 'gold', color: '#F2C94C', name: 'Gold', baseHp:7, value:30, rarity:0.08 },
+      { id: 'gem', color: '#E94B4B', name: 'Edelstein', baseHp:12, value:100, rarity:0.02 }
+    ];
+
+    // Game State
+    const state = {
+      grid: [],          // tiles: {typeIdx, hp, depth}
+      money: 0,
+      level: 1,
+      xp: 0,
+      xpToNext: 50,
+      inventory: {},     // counts by id
+      invSlots: 16,
+      pickLevel: 1,
+      pickPower: 1,      // hits per click
+      autoMiners: 0,
+      autoEnabled: true,
+      autoInterval: 800, // ms per auto hit
+      particles: [],
+      resourceEntities: [], // flying resources to inventory
+      minerAnim: { t:0, dur:200, active:false, x:0, y:0, target:null }
+    };
+
+    // Canvas setup
+    const canvas = document.getElementById('game');
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    // UI elements
+    const moneyEl = document.getElementById('money');
+    const levelEl = document.getElementById('level');
+    const xpfillEl = document.getElementById('xpfill');
+    const inventoryEl = document.getElementById('inventory');
+    const pickLevelEl = document.getElementById('pickLevel');
+    const pickCostEl = document.getElementById('pickCost');
+    const upgradePickBtn = document.getElementById('upgradePick');
+    const buyAutoBtn = document.getElementById('buyAuto');
+    const autoCostEl = document.getElementById('autoCost');
+    const autoCountEl = document.getElementById('autoCount');
+    const buyInvBtn = document.getElementById('buyInv');
+    const invCostEl = document.getElementById('invCost');
+    const invSlotsEl = document.getElementById('invSlots');
+    const sellAllBtn = document.getElementById('sellAll');
+    const toggleAutoBtn = document.getElementById('toggleAuto');
+    const resetBtn = document.getElementById('reset');
+
+    // Initialize grid with depth-based rarity
+    function initGrid() {
+      state.grid = [];
+      for (let r=0;r<ROWS;r++){
+        const row=[];
+        for (let c=0;c<COLS;c++){
+          // Depth from top (0) to bottom (ROWS-1)
+          const depth = r;
+          // Determine resource type by weighted chance based on depth
+          const typeIdx = pickResourceByDepth(depth);
+          const res = RESOURCES[typeIdx];
+          row.push({
+            typeIdx,
+            hp: res.baseHp,
+            maxHp: res.baseHp,
+            depth
+          });
+        }
+        state.grid.push(row);
+      }
+    }
+
+    function pickResourceByDepth(depth){
+      // deeper -> higher chance for rare resources
+      // base chances modified by depth factor
+      const dFactor = depth / (ROWS - 1); // 0..1
+      // Build weighted array
+      const weights = RESOURCES.map((res, idx)=>{
+        if (idx===0) return 0;
+        // modify rarity by depth: gems increase with depth, stone less likely
+        let w = res.rarity;
+        if (res.id === 'stone') w *= (1 - dFactor*0.7); // less stone deeper
+        if (res.id === 'coal') w *= (0.9 + dFactor*0.2);
+        if (res.id === 'iron') w *= (0.8 + dFactor*0.5);
+        if (res.id === 'gold') w *= (0.5 + dFactor*1.0);
+        if (res.id === 'gem') w *= (0.2 + dFactor*3.5);
+        return Math.max(w,0.0001);
+      });
+      const sum = weights.reduce((a,b)=>a+b,0);
+      const r = Math.random()*sum;
+      let s=0;
+      for (let i=0;i<weights.length;i++){
+        s+=weights[i];
+        if (r<=s) return i;
+      }
+      return 1;
+    }
+
+    // Inventory UI
+    function refreshInventoryUI(){
+      inventoryEl.innerHTML='';
+      // Ensure slot list exists with counts for known resource types
+      for (let i=1;i<RESOURCES.length;i++){
+        if (!state.inventory[RESOURCES[i].id]) state.inventory[RESOURCES[i].id]=0;
+      }
+      const ids = Object.keys(state.inventory);
+      // Show only first invSlots items (conceptually we present a grid with counts)
+      for (let i=0;i<state.invSlots;i++){
+        const slot = document.createElement('div');
+        slot.className='inv-slot';
+        const indexResource = ids[i] || null;
+        if (indexResource){
+          const resDef = RESOURCES.find(r=>r.id===indexResource);
+          const icon = document.createElement('div');
+          icon.className='icon';
+          icon.style.background = resDef.color;
+          icon.style.border = '1px solid rgba(0,0,0,0.2)';
+          slot.appendChild(icon);
+          const count = document.createElement('div');
+          count.className='inv-count';
+          count.textContent = state.inventory[indexResource] || 0;
+          slot.appendChild(count);
+        } else {
+          // empty slot placeholder
+          const icon = document.createElement('div');
+          icon.className='icon';
+          icon.style.width='20px';
+          icon.style.height='20px';
+          icon.style.background='linear-gradient(#07121a,#061018)';
+          slot.appendChild(icon);
+        }
+        inventoryEl.appendChild(slot);
+      }
+    }
+
+    // Update top stats
+    function refreshStats(){
+      moneyEl.textContent = state.money;
+      levelEl.textContent = state.level;
+      const pct = Math.min(100, Math.floor((state.xp/state.xpToNext)*100));
+      xpfillEl.style.width = pct + '%';
+      pickLevelEl.textContent = 'Lv.' + state.pickLevel;
+      pickCostEl.textContent = 'Kosten: ' + pickUpgradeCost();
+      autoCostEl.textContent = 'Kosten: ' + autoCost();
+      autoCountEl.textContent = state.autoMiners;
+      invCostEl.textContent = 'Kosten: ' + invCost();
+      invSlotsEl.textContent = state.invSlots;
+    }
+
+    // Costs
+    function pickUpgradeCost(){ return Math.floor(50 * Math.pow(1.5, state.pickLevel-1)); }
+    function autoCost(){ return Math.floor(200 * Math.pow(2, state.autoMiners)); }
+    function invCost(){ return Math.floor(150 * Math.pow(1.8, (state.invSlots-16)/1)); }
+
+    // Mining logic
+    function hitTile(col,row,source='player'){
+      if (col<0||col>=COLS||row<0||row>=ROWS) return;
+      const tile = state.grid[row][col];
+      if (!tile || tile.typeIdx===0) return; // empty
+      // Apply power
+      const power = (source==='player') ? state.pickPower : 1;
+      tile.hp -= power;
+      spawnParticlesForHit(col,row);
+      minerAnimateTo(col,row);
+      if (tile.hp <= 0){
+        // convert tile to empty and drop resource
+        const resDef = RESOURCES[tile.typeIdx];
+        state.grid[row][col] = { typeIdx:0, hp:0, maxHp:0, depth:tile.depth };
+        spawnResourceEntity(col,row,resDef);
+        addXP(Math.floor(resDef.value * 0.3));
+      }
+    }
+
+    // Miner animation (simple arm swing/flash)
+    function minerAnimateTo(col,row){
+      state.minerAnim.active=true;
+      state.minerAnim.t=0;
+      state.minerAnim.dur=220;
+      state.minerAnim.target={col,row};
+    }
+
+    // Resource entity flying to inventory
+    function spawnResourceEntity(col,row,resDef){
+      // start position (tile center)
+      const sx = col*TILE + TILE/2;
+      const sy = row*TILE + TILE/2;
+      // Determine target inventory slot position on screen (approx)
+      // We'll map first slots across the left inventory element
+      const rect = inventoryEl.getBoundingClientRect();
+      // Fallback in case UI not visible
+      const tx = 40 + Math.random()*40;
+      const ty = window.innerHeight - 80;
+      // We'll compute target relative to canvas
+      const canvasRect = canvas.getBoundingClientRect();
+      // pick a slot index (by resource type position)
+      const slotIndex = Object.keys(state.inventory).indexOf(resDef.id);
+      let targX = canvasRect.left + 40;
+      let targY = canvasRect.bottom - 40;
+      if (slotIndex >= 0){
+        const colIndex = slotIndex % 4;
+        const rowIndex = Math.floor(slotIndex / 4);
+        const slotEl = inventoryEl.children[colIndex + rowIndex*4];
+        if (slotEl) {
+          const srect = slotEl.getBoundingClientRect();
+          targX = srect.left + srect.width/2 - canvasRect.left;
+          targY = srect.top + srect.height/2 - canvasRect.top;
+        }
+      }
+      // Add entity
+      state.resourceEntities.push({
+        sx, sy,
+        x: sx, y: sy,
+        tx: targX,
+        ty: targY,
+        t:0,
+        dur: 600 + Math.random()*200,
+        resId: resDef.id,
+        color: resDef.color,
+        value: resDef.value
+      });
+    }
+
+    // Particles when hit/break
+    function spawnParticlesForHit(col,row){
+      const cx = col*TILE + TILE/2;
+      const cy = row*TILE + TILE/2;
+      for (let i=0;i<6;i++){
+        const angle = Math.random()*Math.PI*2;
+        const speed = 40 + Math.random()*80;
+        state.particles.push({
+          x:cx, y:cy,
+          vx: Math.cos(angle)*speed,
+          vy: Math.sin(angle)*speed - 30,
+          life:300 + Math.random()*300,
+          t:0,
+          size: 2 + Math.random()*3,
+          color: '#ffffff'
+        });
+      }
+    }
+
+    // Add resource to inventory (called when resource entity reaches target)
+    function collectResource(resId, value){
+      // If inventory full (counts occupying first invSlots), either auto-sell or drop
+      const uniqueKinds = Object.keys(state.inventory);
+      // In this prototype, inventory holds counts per type; slot count limits visible slots
+      state.inventory[resId] = (state.inventory[resId] || 0) + 1;
+      // immediate small money? we let selling handle money; but give small auto-pickup: if inventory exceeded visible slots, auto-sell
+      const totalKinds = uniqueKinds.length;
+      // if total kinds > invSlots, auto-sell this one
+      // We'll implement simple auto-sell if number of items (sum of counts) > invSlots*10
+      const totalItems = Object.values(state.inventory).reduce((a,b)=>a+b,0);
+      if (totalItems > state.invSlots*10){
+        // auto-sell 1 unit
+        state.inventory[resId] -= 1;
+        state.money += Math.floor(value * 0.8);
+      }
+    }
+
+    // XP and level
+    function addXP(n){
+      state.xp += n;
+      while (state.xp >= state.xpToNext){
+        state.xp -= state.xpToNext;
+        state.level++;
+        state.xpToNext = Math.floor(state.xpToNext * 1.4);
+        // reward: small money bonus & increase inv
+        state.money += Math.floor(10 * state.level);
+      }
+    }
+
+    // Rendering
+    function render(){
+      // Clear
+      ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+      // Draw background "dirt" with vertical gradient per depth
+      for (let r=0;r<ROWS;r++){
+        for (let c=0;c<COLS;c++){
+          const t = state.grid[r][c];
+          // background gradient dependent on depth
+          const depthFactor = r / (ROWS-1);
+          // Use base brown shades
+          const col = lerpColor('#C9A67E','#4B2E1A', depthFactor);
+          ctx.fillStyle = col;
+          ctx.fillRect(c*TILE, r*TILE, TILE, TILE);
+          // Draw block overlay
+          if (t && t.typeIdx !== 0){
+            const res = RESOURCES[t.typeIdx];
+            // draw block square with highlight
+            ctx.fillStyle = res.color;
+            roundRect(ctx, c*TILE+2, r*TILE+2, TILE-4, TILE-4, 3);
+            // cracked overlay proportional to hp
+            const crack = 1 - (t.hp / t.maxHp);
+            if (crack > 0 && t.maxHp>0){
+              ctx.fillStyle = `rgba(0,0,0,${Math.min(crack*0.6,0.6)})`;
+              ctx.fillRect(c*TILE+2, r*TILE+2, (TILE-4)*crack, TILE-4);
+            }
+            // subtle border
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.strokeRect(c*TILE+2, r*TILE+2, TILE-4, TILE-4);
+          } else {
+            // empty tile: draw darker hole
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.fillRect(c*TILE+4, r*TILE+6, TILE-8, TILE-8);
+          }
+        }
+      }
+
+      // Draw miner (simple sprite at bottom center)
+      const minerX = Math.floor(CANVAS_W/2 - TILE*1.0);
+      const minerY = (ROWS-1)*TILE - TILE/2;
+      drawMiner(ctx, minerX, minerY);
+
+      // Draw particles
+      const now = performance.now();
+      for (let i=state.particles.length-1;i>=0;i--){
+        const p = state.particles[i];
+        const lifeRatio = 1 - (p.t / p.life);
+        ctx.fillStyle = `rgba(255,255,255,${lifeRatio})`;
+        ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+      }
+
+      // Draw flying resource entities
+      for (let e of state.resourceEntities){
+        ctx.fillStyle = e.color;
+        ctx.fillRect(e.x-6, e.y-6, 12, 12);
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.strokeRect(e.x-6, e.y-6, 12, 12);
+      }
+    }
+
+    // Draw miner simple pixel sprite + swing animation
+    function drawMiner(ctx,x,y){
+      // body 2x2 tiles (64x64 area)
+      const baseX = x;
+      const baseY = y;
+      // draw legs
+      ctx.fillStyle = '#3a3a3a';
+      ctx.fillRect(baseX+10, baseY+18, 10, 12);
+      ctx.fillRect(baseX+22, baseY+18, 10, 12);
+      // body
+      ctx.fillStyle = '#6aa0ff';
+      ctx.fillRect(baseX+8, baseY+6, 28, 18);
+      // helmet
+      ctx.fillStyle = '#f5e06e';
+      ctx.fillRect(baseX+6, baseY-2, 32, 10);
+      // lamp
+      ctx.fillStyle = '#ffd';
+      ctx.fillRect(baseX+18, baseY-0, 6, 4);
+      // pickaxe swing: if minerAnim active, draw arm rotated toward target
+      let swing=0;
+      if (state.minerAnim.active){
+        const t = state.minerAnim.t / state.minerAnim.dur;
+        swing = Math.sin(t * Math.PI) * 0.9; // -0.9..0.9
+      }
+      // compute arm position
+      ctx.save();
+      ctx.translate(baseX+30, baseY+14);
+      ctx.rotate(-0.35 + swing*0.6);
+      ctx.fillStyle = '#555';
+      ctx.fillRect(0, -2, 18, 4); // handle
+      ctx.fillStyle = '#999';
+      ctx.fillRect(16, -6, 6, 12); // head
+      ctx.restore();
+      // small click feedback (glow)
+      if (state.minerAnim.active){
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(baseX+6, baseY-2, 32, 32);
+      }
+    }
+
+    // Animation & updates
+    let lastTime = performance.now();
+    function tick(now){
+      const dt = Math.min(40, now - lastTime);
+      lastTime = now;
+      // update particles
+      for (let i=state.particles.length-1;i>=0;i--){
+        const p = state.particles[i];
+        p.t += dt;
+        if (p.t >= p.life){
+          state.particles.splice(i,1);
+          continue;
+        }
+        const f = dt/1000;
+        p.vy += 200 * f; // gravity
+        p.x += p.vx * f;
+        p.y += p.vy * f;
+      }
+      // update resource entities
+      for (let i=state.resourceEntities.length-1;i>=0;i--){
+        const e = state.resourceEntities[i];
+        e.t += dt;
+        const tt = e.t / e.dur;
+        // simple ease
+        const ease = easeOutCubic(Math.min(1,tt));
+        e.x = lerp(e.sx, e.tx, ease);
+        e.y = lerp(e.sy, e.ty, ease) - Math.sin(e.t / 180 * Math.PI) * 30 * (1-ease);
+        if (e.t >= e.dur){
+          // collect into inventory
+          collectResource(e.resId, e.value);
+          state.resourceEntities.splice(i,1);
+          refreshInventoryUI();
+        }
+      }
+      // update miner anim timer
+      if (state.minerAnim.active){
+        state.minerAnim.t += dt;
+        if (state.minerAnim.t >= state.minerAnim.dur) {
+          state.minerAnim.active=false;
+          state.minerAnim.t=0;
+        }
+      }
+      render();
+      refreshStats();
+      requestAnimationFrame(tick);
+    }
+
+    // Utility drawing helpers
+    function roundRect(ctx, x, y, w, h, r){
+      ctx.fillRect(x,y,w,h); // keep simple: no rounding for pixel style
+    }
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function easeOutCubic(t){ return (--t)*t*t+1; }
+    function lerpColor(a,b,t){
+      // a,b hex strings; returns hex
+      const ac = hexToRgb(a);
+      const bc = hexToRgb(b);
+      const rc = {
+        r: Math.round(lerp(ac.r,bc.r,t)),
+        g: Math.round(lerp(ac.g,bc.g,t)),
+        b: Math.round(lerp(ac.b,bc.b,t))
+      };
+      return `rgb(${rc.r},${rc.g},${rc.b})`;
+    }
+    function hexToRgb(hex){
+      if (hex.startsWith('#')) hex = hex.slice(1);
+      if (hex.length === 3) hex = hex.split('').map(s=>s+s).join('');
+      const num = parseInt(hex,16);
+      return { r: (num>>16)&255, g:(num>>8)&255, b:num&255 };
+    }
+
+    // Mouse / Touch handling: clicking grid tile
+    canvas.addEventListener('click', (ev)=>{
+      const rect = canvas.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const y = ev.clientY - rect.top;
+      const col = Math.floor(x / TILE);
+      const row = Math.floor(y / TILE);
+      hitTile(col,row,'player');
+    });
+
+    // Upgrades
+    upgradePickBtn.addEventListener('click', ()=>{
+      const cost = pickUpgradeCost();
+      if (state.money >= cost){
+        state.money -= cost;
+        state.pickLevel++;
+        state.pickPower = Math.floor(1 + state.pickLevel*1); // simple scale
+        // pick upgrade animation (particles + small money effect)
+        for (let i=0;i<14;i++) spawnParticlesForHit(Math.floor(COLS/2), ROWS-3);
+      }
+      refreshStats();
+    });
+    buyAutoBtn.addEventListener('click', ()=>{
+      const cost = autoCost();
+      if (state.money >= cost){
+        state.money -= cost;
+        state.autoMiners++;
+      }
+      refreshStats();
+    });
+    buyInvBtn.addEventListener('click', ()=>{
+      const cost = invCost();
+      if (state.money >= cost){
+        state.money -= cost;
+        state.invSlots += 4;
+      }
+      refreshInventoryUI();
+      refreshStats();
+    });
+    sellAllBtn.addEventListener('click', ()=>{
+      // Sell inventory all
+      let gain = 0;
+      for (let k in state.inventory){
+        const def = RESOURCES.find(r=>r.id===k);
+        const count = state.inventory[k] || 0;
+        gain += count * def.value;
+        state.inventory[k] = 0;
+      }
+      // apply small sell penalty
+      gain = Math.floor(gain * 0.9);
+      state.money += gain;
+      refreshInventoryUI();
+      refreshStats();
+    });
+    toggleAutoBtn.addEventListener('click', ()=>{
+      state.autoEnabled = !state.autoEnabled;
+      toggleAutoBtn.textContent = state.autoEnabled ? 'Auto On' : 'Auto Off';
+    });
+    resetBtn.addEventListener('click', ()=>{
+      if (!confirm('Reset progress?')) return;
+      // basic reset
+      state.money = 0;
+      state.level = 1;
+      state.xp = 0;
+      state.xpToNext = 50;
+      state.inventory = {};
+      state.invSlots = 16;
+      state.pickLevel = 1;
+      state.pickPower = 1;
+      state.autoMiners = 0;
+      initGrid();
+      refreshInventoryUI();
+      refreshStats();
+    });
+
+    // Auto miners logic: each auto miner picks nearest non-empty tile and hits periodically
+    function startAutoMiners(){
+      setInterval(()=>{
+        if (!state.autoEnabled || state.autoMiners<=0) return;
+        for (let i=0;i<state.autoMiners;i++){
+          // pick random non-empty tile from visible grid
+          const nonEmpty = [];
+          for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++){
+            if (state.grid[r][c] && state.grid[r][c].typeIdx !== 0) nonEmpty.push({c,r});
+          }
+          if (nonEmpty.length===0) return;
+          const pick = nonEmpty[Math.floor(Math.random()*nonEmpty.length)];
+          hitTile(pick.c, pick.r, 'auto');
+        }
+      }, state.autoInterval);
+    }
+
+    // INITIALIZATION
+    function seedInitialState(){
+      state.money = 120;
+      state.inventory = {};
+      state.invSlots = 16;
+      state.pickLevel = 1;
+      state.pickPower = 1;
+      state.autoMiners = 0;
+      state.xp = 0;
+      state.level = 1;
+    }
+    seedInitialState();
+    initGrid();
+    refreshInventoryUI();
+    refreshStats();
+    startAutoMiners();
+    requestAnimationFrame(tick);
+
+    // Simple helper: on resize adjust canvas style (scale down on small screens)
+    function adjustCanvasSize(){
+      const wrapperWidth = Math.min(window.innerWidth-460, 760);
+      // keep original pixel canvas but scale via CSS to fit
+      const maxWidth = Math.min(window.innerWidth - 240, 760);
+      const scale = Math.min(1, maxWidth / CANVAS_W);
+      canvas.style.width = Math.floor(CANVAS_W * scale) + 'px';
+      canvas.style.height = Math.floor(CANVAS_H * scale) + 'px';
+    }
+    window.addEventListener('resize', adjustCanvasSize);
+    adjustCanvasSize();
+
+    // Utility: debug spawn random gem button (not exposed)
+    // function debugFillGems(){ state.grid[Math.floor(ROWS/2)][Math.floor(COLS/2)].typeIdx=5; state.grid[Math.floor(ROWS/2)][Math.floor(COLS/2)].hp=12; }
+
+  </script>
+</body>
+</html>
