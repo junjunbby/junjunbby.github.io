@@ -85,11 +85,11 @@ let high = parseInt(localStorage.getItem('gd_high')||'0',10);
 highEl.textContent = high;
 
 // Player
-const player = { x:150, y:0, w:34, h:34, vy:0, grounded:true, worldX:0 };
+const player = { x:150, y:0, w:34, h:34, vy:0, grounded:true, vx:0 };
 
 // Camera/world
 let worldX = 0;
-let scrollSpeed = 240;
+let scrollSpeed = 220;
 
 // Physics
 const GRAV = 1600;
@@ -107,7 +107,7 @@ const LEVELS = [
   { name:'Time Machine', length:2800,speedMul:1.36, platforms:[{x:0,w:2800,y:H-80}], spikes:[{x:260,w:32},{x:420,w:32},{x:580,w:32},{x:860,w:32},{x:1220,w:32},{x:1700,w:32},{x:2140,w:32}], gaps:[{x:700,w:140},{x:1500,w:160},{x:2400,w:160}] }
 ];
 
-// --- Build runtime platforms/spikes ---
+// --- Build platforms & spikes ---
 function buildSegments(level){
   const base = [];
   for(const p of level.platforms){
@@ -129,8 +129,7 @@ function buildSpikes(level){
 }
 
 // --- Game runtime ---
-let currentLevel=null, segments=[], spikes=[];
-let levelLength=0;
+let currentLevel=null, segments=[], spikes=[], levelLength=0;
 
 function loadLevel(i){
   levelIndex=Math.max(0,Math.min(i,LEVELS.length-1));
@@ -140,7 +139,7 @@ function loadLevel(i){
   scrollSpeed=220*currentLevel.speedMul;
   segments=buildSegments(currentLevel);
   spikes=buildSpikes(currentLevel);
-  player.worldX=0;
+  player.x=150; player.vx=0;
   player.y=H-80-player.h;
   player.vy=0;
   player.grounded=true;
@@ -151,13 +150,14 @@ function loadLevel(i){
 // --- Start / Next ---
 startBtn.addEventListener('click', () => {
   loadLevel(levelIndex);
-  running = true;          // start immediately
-  statusEl.textContent = 'Running';
+  running=true;
+  statusEl.textContent='Running';
+  player.vx = 220; // player starts moving right
 });
 nextBtn.addEventListener('click', () => {
   loadLevel(levelIndex+1);
-  running = false;
-  statusEl.textContent = 'Loaded';
+  running=false;
+  statusEl.textContent='Loaded';
 });
 
 // --- Input ---
@@ -168,7 +168,8 @@ canvas.addEventListener('touchstart', e=>{ doJump(); e.preventDefault(); }, {pas
 
 // --- Collision ---
 function checkSpikeCollision(){
-  const px=player.worldX, py=player.y;
+  const px=player.x + player.vx * 0; // position in world
+  const py=player.y;
   for(const s of spikes){
     const sx=s.x, sw=s.w, sy=s.y, sTop=sy-18;
     if(px+player.w>sx && px<sx+sw && py+player.h>sTop) return true;
@@ -176,7 +177,7 @@ function checkSpikeCollision(){
   return false;
 }
 function groundUnderPlayer(){
-  const px = player.worldX;
+  const px = player.x;
   for(const seg of segments){ if(px + player.w/2 >= seg.x && px + player.w/2 <= seg.x + seg.w) return seg.y; }
   return null;
 }
@@ -188,13 +189,12 @@ function updateScoreUI(){ scoreEl.textContent=Math.floor(score); highEl.textCont
 // --- Game loop ---
 let last=performance.now();
 function loop(now){
-  const dt = Math.min(0.033, (now-last)/1000);
-  last = now;
+  const dt = Math.min(0.033,(now-last)/1000);
+  last=now;
 
   if(running){
-    const playerSpeed = scrollSpeed * 1.05;
-    player.worldX += playerSpeed*dt; // move forward automatically
-    worldX = player.worldX - player.x;
+    player.x += player.vx*dt;
+    worldX = player.x - 150; // camera follows player
 
     player.vy += GRAV*dt;
     player.y += player.vy*dt;
@@ -207,14 +207,14 @@ function loop(now){
 
     if(checkSpikeCollision()) die();
 
-    if(player.worldX >= levelLength-200){
+    if(player.x >= levelLength-200){
       running=false;
       statusEl.textContent='Complete!';
       beep(1200,0.2,0.18,'sine');
       if(score>high){ high=Math.floor(score); localStorage.setItem('gd_high',high); }
     }
 
-    score += playerSpeed*dt*0.02;
+    score += player.vx*dt*0.02;
     updateScoreUI();
   }
 
@@ -230,7 +230,6 @@ function render(){
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#7fd3ff'; ctx.fillRect(0,0,W,H);
 
-  // clouds
   ctx.globalAlpha=0.2;
   for(let i=0;i<5;i++){
     const cx=((i*330 - worldX*0.2)%(W+200))-100;
@@ -261,7 +260,7 @@ function render(){
 
   ctx.restore();
 
-  const progress=Math.min(1,player.worldX/Math.max(1,levelLength-200));
+  const progress=Math.min(1,player.x/Math.max(1,levelLength-200));
   ctx.fillStyle='#ffffff22'; ctx.fillRect(20,10,W-40,8);
   ctx.fillStyle='#ffcc33'; ctx.fillRect(20,10,(W-40)*progress,8);
 }
@@ -280,7 +279,7 @@ fitCanvas();
 // --- Start loop ---
 requestAnimationFrame(loop);
 
-// dblclick for next level (testing)
+// dblclick for next level
 canvas.addEventListener('dblclick',()=>{ loadLevel(levelIndex+1); });
 
 </script>
