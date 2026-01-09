@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dino Run — MVP</title>
+<style>
+  body { margin:0; font-family:sans-serif; background:#f7f7f7; overflow:hidden; }
+  canvas { display:block; background:#f7f7f7; margin:0 auto; }
+  #ui { position:absolute; top:10px; left:50%; transform:translateX(-50%); font-weight:bold; font-size:18px; }
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span></div>
+<canvas id="c" width="800" height="200"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+let W = canvas.width, H = canvas.height;
+
+// --- Game state ---
+let running = false;
+let score = 0;
+let high = parseInt(localStorage.getItem('dino_high')||'0',10);
+let lastTime = 0;
+
+// --- Player ---
+const player = { x:50, y:0, w:40, h:40, vy:0, grounded:true, vx:5 };
+
+// --- Physics ---
+const GRAV = 1500;
+const JUMP_V = 600;
+
+// --- Obstacles ---
+let obstacles = [];
+let spawnTimer = 0;
+const OBSTACLE_INTERVAL = 1.5; // seconds
+
+// --- Input ---
+function jump(){ if(player.grounded){ player.vy=-JUMP_V; player.grounded=false; beep(800,0.08,0.12,'square'); } }
+window.addEventListener('keydown', e=>{ if(e.code==='Space' || e.code==='ArrowUp'){ e.preventDefault(); jump(); } });
+canvas.addEventListener('mousedown', jump);
+canvas.addEventListener('touchstart', e=>{ jump(); e.preventDefault(); }, {passive:false});
+
+// --- Audio ---
+const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function beep(freq=440,dur=0.08,vol=0.12,type='sine'){
+  const o=AudioCtx.createOscillator(), g=AudioCtx.createGain();
+  o.type=type; o.frequency.value=freq; g.gain.value=0; o.connect(g); g.connect(AudioCtx.destination);
+  const now=AudioCtx.currentTime;
+  g.gain.linearRampToValueAtTime(vol,now+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,now+dur+0.01);
+  o.start(now); o.stop(now+dur+0.02);
+}
+window.addEventListener('pointerdown', ()=>{ if(AudioCtx.state==='suspended') AudioCtx.resume(); }, {once:true});
+
+// --- Start Game ---
+canvas.addEventListener('click', ()=>{ if(!running){ startGame(); } });
+function startGame(){
+  running=true;
+  score=0;
+  player.y=H-50-player.h;
+  player.vy=0;
+  player.grounded=true;
+  obstacles=[];
+  spawnTimer=0;
+}
+
+// --- Game Loop ---
+function loop(timestamp){
+  const dt = (timestamp-lastTime)/1000 || 0;
+  lastTime=timestamp;
+  if(running){
+    // --- Update ---
+    player.vy += GRAV*dt;
+    player.y += player.vy*dt;
+
+    // Ground collision
+    const groundY = H-50-player.h;
+    if(player.y>groundY){ player.y=groundY; player.vy=0; player.grounded=true; }
+
+    // Obstacles
+    spawnTimer += dt;
+    if(spawnTimer > OBSTACLE_INTERVAL){
+      spawnTimer=0;
+      const w = 20+Math.random()*20;
+      obstacles.push({x:W, y:H-50-w/2, w:w, h:w});
+    }
+    obstacles.forEach(ob => ob.x -= player.vx*60*dt);
+
+    // Collision
+    for(const ob of obstacles){
+      if(player.x + player.w > ob.x && player.x < ob.x+ob.w && player.y + player.h > ob.y){
+        gameOver();
+      }
+    }
+
+    // Remove offscreen obstacles
+    obstacles = obstacles.filter(ob => ob.x+ob.w>0);
+
+    // Score
+    score += player.vx*dt*10;
+    scoreEl.textContent=Math.floor(score);
+  }
+
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// --- Game Over ---
+function gameOver(){
+  running=false;
+  beep(150,0.25,0.18,'sawtooth');
+  if(Math.floor(score)>high){ high=Math.floor(score); localStorage.setItem('dino_high',high); }
+  alert('Game Over! Score: '+Math.floor(score));
+}
+
+// --- Render ---
+function render(){
+  ctx.clearRect(0,0,W,H);
+
+  // Ground
+  ctx.fillStyle="#555";
+  ctx.fillRect(0,H-50,W,50);
+
+  // Player
+  ctx.fillStyle="#ff3b3b";
+  ctx.fillRect(player.x,player.y,player.w,player.h);
+
+  // Obstacles
+  ctx.fillStyle="#0b1020";
+  obstacles.forEach(ob => ctx.fillRect(ob.x, ob.y, ob.w, ob.h));
+}
+
+// Resize canvas
+window.addEventListener('resize', ()=>{ canvas.style.width='100%'; });
+</script>
+</body>
+</html>
