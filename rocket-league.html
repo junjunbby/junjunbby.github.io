@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini Rocket League — Browser MVP (Top-down 2.5D)</title>
+<style>
+  :root{
+    --bg:#0c1220;
+    --panel: rgba(255,255,255,0.04);
+    --ui:#ffffffcc;
+    --accent:#39d;
+    --danger:#ff5252;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:var(--ui)}
+  #root{display:flex;align-items:center;justify-content:center;height:100%;padding:18px;box-sizing:border-box}
+  canvas{background:#0b6c3d;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.7);max-width:100%;height:auto}
+  .ui {
+    position: absolute;
+    left:50%;
+    top:22px;
+    transform:translateX(-50%);
+    display:flex;
+    gap:14px;
+    align-items:center;
+    pointer-events:none;
+  }
+  .panel {
+    background:var(--panel);
+    border-radius:10px;
+    padding:8px 12px;
+    pointer-events:auto;
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .big {font-weight:800;font-size:20px}
+  .muted{color:rgba(255,255,255,0.7);font-size:13px}
+  #leftHud{position:absolute;left:22px;top:22px}
+  #rightHud{position:absolute;right:22px;top:22px}
+  #bottomHud{position:absolute;left:50%;transform:translateX(-50%);bottom:24px;display:flex;gap:12px}
+  .boostBar{width:160px;height:12px;background:rgba(0,0,0,0.25);border-radius:6px;overflow:hidden}
+  .boostFill{height:100%;background:linear-gradient(90deg,#56f 0%,#aef 100%);width:0%}
+  button {background:var(--accent);border:none;padding:8px 10px;border-radius:8px;color:#042;font-weight:700;cursor:pointer}
+  .secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--ui)}
+  .centerColumn{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .controls{position:absolute;left:18px;bottom:18px;background:rgba(0,0,0,0.35);padding:8px 10px;border-radius:8px;font-size:13px}
+  #debug{position:absolute;left:18px;top:120px;background:rgba(0,0,0,0.25);padding:8px 10px;border-radius:8px;font-size:12px;color:#cfc;white-space:pre}
+  @media (max-width:900px){
+    .ui{top:12px}
+    #bottomHud{bottom:12px}
+    .boostBar{width:120px}
+  }
+</style>
+</head>
+<body>
+<div id="root">
+  <canvas id="game" width="1200" height="680"></canvas>
+
+  <div class="ui" id="uiTop">
+    <div class="panel centerColumn" id="scorePanel" style="min-width:200px">
+      <div style="font-size:14px;color:rgba(255,255,255,0.9)">Mini Rocket — Freeplay</div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="big" id="scoreLeft">0</div>
+        <div class="muted">—</div>
+        <div class="big" id="scoreRight">0</div>
+      </div>
+      <div class="muted" id="timer">00:00</div>
+    </div>
+
+    <div class="panel" style="min-width:300px;justify-content:center">
+      <div class="muted">Controls:</div>
+      <div style="margin-left:8px;font-weight:700">W/↑ Throttle • S/↓ Reverse • A/D Steer • Space Jump • Shift Boost • R Reset</div>
+    </div>
+
+    <div class="panel" id="menuPanel" style="margin-left:12px">
+      <button id="resetBtn">Reset</button>
+      <button id="toggleDebug" class="secondary" style="margin-left:6px">Toggle Debug</button>
+    </div>
+  </div>
+
+  <div id="leftHud" class="panel">
+    <div style="width:180px">
+      <div class="muted">Boost</div>
+      <div class="boostBar"><div class="boostFill" id="boostFill"></div></div>
+    </div>
+  </div>
+
+  <div id="rightHud" class="panel">
+    <div style="width:220px">
+      <div class="muted">Mode</div>
+      <div style="font-weight:800">Freeplay • 1 Player</div>
+      <div style="margin-top:6px" class="muted small">Highscore (goals): <span id="hsVal">0</span></div>
+    </div>
+  </div>
+
+  <div id="bottomHud" style="pointer-events:none">
+    <div class="panel muted">Tip: Use boost to perform aerials — this MVP simulates vertical motion in a simplified 3D model.</div>
+  </div>
+
+  <div class="controls muted">Mini RL MVP — top-down 2.5D physics • Press H for help</div>
+
+  <div id="debug" style="display:none"></div>
+</div>
+
+<script>
+/*
+Mini Rocket League — Browser MVP (single-file)
+- Top-down 2.5D prototype implementing core mechanics:
+  * Car movement (throttle, steer), boost, jump/double-jump, flip (simple dodge)
+  * Ball physics with vertical component (z), gravity, bounces
+  * Sphere-sphere impulse collision (ball <-> car), floor bounce, wall collisions
+  * Boost pads, HUD, goals, basic scoring, localStorage highscore
+  * Fixed-step physics loop with interpolation for rendering
+  * Simple procedural sound effects via WebAudio
+This is a simplified educational prototype — not a full Rocket League clone.
+*/
+
+// ----------------------- Utilities -----------------------
+const nowMs = () => performance.now();
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+class Vec3 {
+  constructor(x=0,y=0,z=0){ this.x=x; this.y=y; this.z=z; }
+  copy(){ return new Vec3(this.x,this.y,this.z); }
+  set(x,y,z){ this.x=x; this.y=y; this.z=z; return this; }
+  add(v){ this.x+=v.x; this.y+=v.y; this.z+=v.z; return this; }
+  sub(v){ this.x-=v.x; this.y-=v.y; this.z-=v.z; return this; }
+  mul(s){ this.x*=s; this.y*=s; this.z*=s; return this; }
+  length(){ return Math.hypot(this.x,this.y,this.z); }
+  length2(){ return this.x*this.x + this.y*this.y + this.z*this.z; }
+  normalize(){ const L=this.length()||1; this.x/=L; this.y/=L; this.z/=L; return this; }
+  dot(v){ return this.x*v.x + this.y*v.y + this.z*v.z; }
+  dist2(v){ const dx=this.x-v.x, dy=this.y-v.y, dz=this.z-v.z; return dx*dx+dy*dy+dz*dz; }
+  static add(a,b){ return new Vec3(a.x+b.x,a.y+b.y,a.z+b.z); }
+  static sub(a,b){ return new Vec3(a.x-b.x,a.y-b.y,a.z-b.z); }
+}
+
+// 2D helpers (for rendering / field coords)
+class Vec2 {
+  constructor(x=0,y=0){ this.x=x; this.y=y; }
+  copy(){ return new Vec2(this.x,this.y); }
+  add(v){ this.x+=v.x; this.y+=v.y; return this; }
+  sub(v){ this.x-=v.x; this.y-=v.y; return this; }
+  mul(s){ this.x*=s; this.y*=s; return this; }
+  length(){ return Math.hypot(this.x,this.y); }
+  normalize(){ const L=this.length()||1; this.x/=L; this.y/=L; return this; }
+  static fromAngle(a){ return new Vec2(Math.cos(a), Math.sin(a)); }
+}
+
+// ----------------------- Config & constants -----------------------
+const CONFIG = {
+  // Arena in meters (conceptual); we'll scale to px for canvas rendering
+  arena: { width: 51, length: 84 }, // standard-ish (m)
+  meterToPx: 9.5, // pixels per meter (tune to canvas)
+  ball: { radius_m: 0.92, mass: 45, restitution: 0.65, airDrag: 0.015 },
+  car: { radius_m: 1.2, mass: 180, restitution: 0.2, topSpeed_mps: 35 },
+  gravity: 9.81, // m/s^2 (applies to z)
+  physicsHz: 120, // physics timestep
+  boostPadSmall: { boost: 12, respawn: 4 },
+  boostPadBig: { boost: 100, respawn: 10 },
+  matchTime: 180 // seconds for timed matches (not enforced in freeplay here)
+};
+
+// Derived
+CONFIG.arena_px = { width: CONFIG.arena.width * CONFIG.meterToPx, length: CONFIG.arena.length * CONFIG.meterToPx };
+
+// ----------------------- Canvas & Render -----------------------
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { antialias: true });
+let CANVAS_W = canvas.width, CANVAS_H = canvas.height;
+
+// Field rectangle centered in canvas
+const FIELD = {
+  pxW: Math.min(CONFIG.arena_px.width, CANVAS_W - 140),
+  pxH: Math.min(CONFIG.arena_px.length, CANVAS_H - 140)
+};
+FIELD.left = (CANVAS_W - FIELD.pxW)/2;
+FIELD.top = (CANVAS_H - FIELD.pxH)/2;
+FIELD.right = FIELD.left + FIELD.pxW;
+FIELD.bottom = FIELD.top + FIELD.pxH;
+
+// Coordinate conversion: world meters -> canvas px (centered)
+function worldToCanvas(x_m, y_m){
+  // world origin at center of field; +x right, +y forward (towards top of screen negative maybe)
+  const cx = FIELD.left + FIELD.pxW * 0.5 + x_m * CONFIG.meterToPx;
+  const cy = FIELD.top + FIELD.pxH * 0.5 - y_m * CONFIG.meterToPx;
+  return new Vec2(cx, cy);
+}
+function canvasToWorld(px, py){
+  const x_m = (px - (FIELD.left + FIELD.pxW*0.5)) / CONFIG.meterToPx;
+  const y_m = - (py - (FIELD.top + FIELD.pxH*0.5)) / CONFIG.meterToPx;
+  return { x: x_m, y: y_m };
+}
+
+// Draw helpers
+function drawRoundedRect(x,y,w,h,r,fillStyle,strokeStyle){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  if(fillStyle){ ctx.fillStyle = fillStyle; ctx.fill(); }
+  if(strokeStyle){ ctx.strokeStyle = strokeStyle; ctx.stroke(); }
+}
+
+// ----------------------- Audio (procedural SFX) -----------------------
+const AudioSys = (() => {
+  const Ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const master = Ctx.createGain(); master.gain.value = 0.9; master.connect(Ctx.destination);
+  function playClick(){ // short UI click
+    const o = Ctx.createOscillator(); const g = Ctx.createGain();
+    o.type='sine'; o.frequency.value=900; g.gain.value=0;
+    o.connect(g); g.connect(master);
+    const now = Ctx.currentTime; g.gain.linearRampToValueAtTime(0.08, now+0.001); g.gain.exponentialRampToValueAtTime(0.001, now+0.09);
+    o.start(now); o.stop(now+0.11);
+  }
+  function playThump(intensity=1){
+    const o = Ctx.createOscillator(); const g = Ctx.createGain();
+    o.type='square'; o.frequency.value=120*intensity; g.gain.value=0;
+    o.connect(g); g.connect(master);
+    const now = Ctx.currentTime; g.gain.linearRampToValueAtTime(0.18*intensity, now+0.001); g.gain.exponentialRampToValueAtTime(0.001, now+0.25);
+    o.start(now); o.stop(now+0.28);
+  }
+  function playBoost(){ const o = Ctx.createOscillator(); const g = Ctx.createGain(); o.type='sawtooth'; o.frequency.value=600; o.connect(g); g.connect(master); g.gain.value=0.02; o.start(); setTimeout(()=>{ o.stop(); }, 140); }
+  return { playClick, playThump, playBoost, ctx: Ctx };
+})();
+
+// ----------------------- Entities -----------------------
+class Ball {
+  constructor(){
+    this.radius = CONFIG.ball.radius_m; // meters
+    this.mass = CONFIG.ball.mass;
+    this.pos = new Vec3(0, 0, this.radius); // meters
+    this.vel = new Vec3(0,0,0); // m/s
+    this.restitution = CONFIG.ball.restitution;
+    this.airDrag = CONFIG.ball.airDrag;
+    this.lastHit = null;
+  }
+  reset(){
+    this.pos.set(0,0,this.radius);
+    this.vel.set(0,0,0);
+  }
+  applyImpulse(imp){ // imp: Vec3
+    this.vel.add(new Vec3(imp.x / this.mass, imp.y / this.mass, imp.z / this.mass));
+  }
+  update(dt){
+    // linear integrate with gravity and drag (3D)
+    // gravity on z
+    this.vel.z -= CONFIG.gravity * dt;
+    // drag on x,y (air)
+    this.vel.x *= (1 - this.airDrag*dt);
+    this.vel.y *= (1 - this.airDrag*dt);
+    this.vel.z *= (1 - (this.airDrag*0.8)*dt);
+
+    this.pos.x += this.vel.x * dt;
+    this.pos.y += this.vel.y * dt;
+    this.pos.z += this.vel.z * dt;
+    // floor collision
+    if(this.pos.z < this.radius){
+      this.pos.z = this.radius;
+      if(this.vel.z < 0){
+        this.vel.z = -this.vel.z * this.restitution;
+        // small ground friction
+        this.vel.x *= 0.98;
+        this.vel.y *= 0.98;
+      }
+      // clamp tiny bounces
+      if(Math.abs(this.vel.z) < 0.5) this.vel.z = 0;
+    }
+    // damp extremely small velocities
+    if(Math.abs(this.vel.x) < 0.001) this.vel.x = 0;
+    if(Math.abs(this.vel.y) < 0.001) this.vel.y = 0;
+    if(Math.abs(this.vel.z) < 0.001) this.vel.z = 0;
+  }
+}
+
+class Car {
+  constructor(player=true){
+    this.radius = CONFIG.car.radius_m;
+    this.mass = CONFIG.car.mass;
+    this.pos = new Vec3( - (CONFIG.arena.width*0.25), 0, 0 ); // start at left quarter
+    this.vel = new Vec3(0,0,0);
+    this.angle = 0; // radians, 0 points to +x (right)
+    this.angularVel = 0;
+    this.steer = 0; // -1..1
+    this.throttle = 0; // -1..1
+    this.boost = 100;
+    this.onGround = true;
+    this.zVel = 0; // vertical velocity (we keep separate to simplify)
+    this.jumpAvailable = 2; // double jump
+    this.jumpTimer = 0;
+    this.restitution = CONFIG.car.restitution;
+    this.isPlayer = player;
+    this.color = player ? '#ffcc33' : '#77c3ff';
+    this.name = player ? 'YOU' : 'BOT';
+    this.lastTouchTime = 0;
+  }
+  reset(side=-1){
+    // side -1 left, +1 right
+    this.pos.set(side * (CONFIG.arena.width*0.25), 0, 0);
+    this.vel.set(0,0,0);
+    this.angle = (side>0)? Math.PI : 0;
+    this.angularVel = 0;
+    this.boost = 100;
+    this.onGround = true;
+    this.zVel = 0;
+    this.jumpAvailable = 2;
+  }
+  forwardVec(){
+    return new Vec3(Math.cos(this.angle), Math.sin(this.angle), 0);
+  }
+  rightVec(){
+    return new Vec3(-Math.sin(this.angle), Math.cos(this.angle), 0);
+  }
+  applyImpulse(imp){
+    this.vel.add(new Vec3(imp.x / this.mass, imp.y / this.mass, imp.z / this.mass));
+  }
+  jump(){
+    if(this.jumpAvailable > 0){
+      // simple jump vertical velocity
+      this.zVel = 6.8; // m/s upward (tunable)
+      this.onGround = false;
+      this.jumpAvailable -= 1;
+      this.jumpTimer = 0.28; // short airborne window
+      AudioSys.playThump(0.7);
+    }
+  }
+  boostApply(dt){
+    if(this.boost > 0){
+      const f = 1400; // boost thrust (N) approximate converted below via delta-v
+      const acc = 8.0; // direct addition to forward velocity (tunable)
+      const forward = this.forwardVec();
+      // add to velocity (simplified)
+      this.vel.x += forward.x * acc * dt;
+      this.vel.y += forward.y * acc * dt;
+      this.boost = clamp(this.boost - 33 * dt, 0, 100);
+      AudioSys.playBoost();
+    }
+  }
+  update(dt, input){
+    // input: { throttle, steer, boost, jump }
+    // update jump timer
+    this.jumpTimer = Math.max(0, this.jumpTimer - dt);
+    // vertical
+    if(!this.onGround){
+      this.zVel -= CONFIG.gravity * dt;
+      this.pos.z += this.zVel * dt;
+      if(this.pos.z <= 0){
+        this.pos.z = 0; this.zVel = 0; this.onGround = true; this.jumpAvailable = 2;
+      }
+    } else {
+      this.pos.z = 0;
+    }
+    // controls
+    // throttle influences forward acceleration only when grounded or with limited effect when airborne
+    const throttle = input?.throttle ?? this.throttle;
+    const steer = input?.steer ?? this.steer;
+    const boosting = input?.boost ?? false;
+    // steering sensitivity reduces with speed
+    const speed2d = Math.hypot(this.vel.x, this.vel.y);
+    const steerFactor = clamp(6 - speed2d*0.08, 1.2, 6.0); // rad/s multiplier
+    this.angle += steer * steerFactor * dt;
+
+    // engine acceleration
+    const forward = this.forwardVec();
+    const accel = throttle * (6.8); // m/s^2 approx acceleration
+    // apply accel along forward
+    this.vel.x += forward.x * accel * dt;
+    this.vel.y += forward.y * accel * dt;
+
+    // Boost
+    if(boosting && this.boost > 0){
+      this.boostApply(dt);
+    } else {
+      // passive small regen when idle on ground
+      if(this.onGround && Math.abs(throttle) < 0.05 && speed2d < 0.5){
+        this.boost = clamp(this.boost + 8 * dt, 0, 100);
+      }
+    }
+
+    // lateral friction - reduce sideways velocity relative to forward vector
+    const right = new Vec3(-forward.y, forward.x, 0);
+    const latVel = this.vel.x*right.x + this.vel.y*right.y;
+    const latImpulse = -latVel * 0.9; // lateral damping
+    this.vel.x += right.x * latImpulse;
+    this.vel.y += right.y * latImpulse;
+
+    // forward speed cap
+    const maxSpeed = CONFIG.car.topSpeed_mps;
+    const spd = Math.hypot(this.vel.x, this.vel.y);
+    if(spd > maxSpeed){
+      this.vel.x *= maxSpeed/spd;
+      this.vel.y *= maxSpeed/spd;
+    }
+
+    // integrate position
+    this.pos.x += this.vel.x * dt;
+    this.pos.y += this.vel.y * dt;
+
+    // keep in arena bounds (reflect with restitution)
+    const halfW = CONFIG.arena.width*0.5;
+    const halfL = CONFIG.arena.length*0.5;
+    // if outside, clamp to wall with bounce
+    if(this.pos.x < -halfW){ this.pos.x = -halfW; this.vel.x = -this.vel.x * 0.4; }
+    if(this.pos.x > halfW){ this.pos.x = halfW; this.vel.x = -this.vel.x * 0.4; }
+    if(this.pos.y < -halfL){ this.pos.y = -halfL; this.vel.y = -this.vel.y * 0.4; }
+    if(this.pos.y > halfL){ this.pos.y = halfL; this.vel.y = -this.vel.y * 0.4; }
+
+    // keep small velocities trimmed
+    if(Math.abs(this.vel.x) < 0.001) this.vel.x = 0;
+    if(Math.abs(this.vel.y) < 0.001) this.vel.y = 0;
+  }
+}
+
+// ----------------------- Game State -----------------------
+const ball = new Ball();
+const player = new Car(true);
+const bot = new Car(false);
+
+player.reset(-1); bot.reset(1);
+ball.reset();
+
+let lastTouchBy = null;
+let scoreLeft = 0, scoreRight = 0;
+let highscore = parseInt(localStorage.getItem('mini_rl_hs') || '0', 10);
+document.getElementById('hsVal').textContent = highscore;
+
+// Boost pads (small sample layout)
+const boostPads = [];
+function spawnBoostPads(){
+  boostPads.length = 0;
+  // small pads in grid-like pattern
+  const positions = [
+    // midfield cluster
+    {x:-8, y:0, big:false}, {x:8, y:0, big:false},
+    {x:-2, y:10, big:false}, {x:2, y:-10, big:false},
+    // corner full pads
+    {x:-22, y:16, big:true}, {x:-22, y:-16, big:true},
+    {x:22, y:16, big:true}, {x:22, y:-16, big:true},
+  ];
+  for(const p of positions){
+    boostPads.push({
+      x:p.x, y:p.y,
+      big: p.big,
+      ready: true,
+      respawn: 0
+    });
+  }
+}
+spawnBoostPads();
+
+function resetMatch(){
+  player.reset(-1);
+  bot.reset(1);
+  ball.reset();
+  scoreLeft = 0; scoreRight = 0;
+  lastTouchBy = null;
+  spawnBoostPads();
+  // reset HUD
+  document.getElementById('scoreLeft').textContent = scoreLeft;
+  document.getElementById('scoreRight').textContent = scoreRight;
+}
+
+// ----------------------- Input -----------------------
+const Input = {
+  throttle: 0, steer: 0, boost: false, jump: false
+};
+const keyState = {};
+window.addEventListener('keydown', (e) => {
+  if(e.code==='KeyW' || e.code==='ArrowUp'){ keyState.up=true; Input.throttle = 1; }
+  if(e.code==='KeyS' || e.code==='ArrowDown'){ keyState.down=true; Input.throttle = -1; }
+  if(e.code==='KeyA' || e.code==='ArrowLeft'){ keyState.left=true; Input.steer = -1; }
+  if(e.code==='KeyD' || e.code==='ArrowRight'){ keyState.right=true; Input.steer = 1; }
+  if(e.code==='Space'){ keyState.space=true; Input.jump = true; }
+  if(e.code==='ShiftLeft' || e.code==='ShiftRight'){ keyState.shift=true; Input.boost = true; }
+  if(e.code==='KeyR'){ resetMatch(); AudioSys.playClick(); }
+  if(e.code==='KeyH'){ alert('Mini RL MVP Help:\\nW/S Throttle, A/D Steer, Shift Boost, Space Jump, R Reset'); }
+  if(e.code==='KeyD' && e.ctrlKey){} // noop
+});
+window.addEventListener('keyup', (e) => {
+  if(e.code==='KeyW' || e.code==='ArrowUp'){ keyState.up=false; if(!keyState.down) Input.throttle = 0; else Input.throttle = -1; }
+  if(e.code==='KeyS' || e.code==='ArrowDown'){ keyState.down=false; if(!keyState.up) Input.throttle = 0; else Input.throttle = 1; }
+  if(e.code==='KeyA' || e.code==='ArrowLeft'){ keyState.left=false; if(!keyState.right) Input.steer = 0; else Input.steer = 1; }
+  if(e.code==='KeyD' || e.code==='ArrowRight'){ keyState.right=false; if(!keyState.left) Input.steer = 0; else Input.steer = -1; }
+  if(e.code==='Space'){ keyState.space=false; Input.jump = false; }
+  if(e.code==='ShiftLeft' || e.code==='ShiftRight'){ keyState.shift=false; Input.boost = false; }
+});
+
+// ----------------------- Simple Bot (very basic) -----------------------
+function botAI(bot, dt){
+  // drives toward ball, tries to boost if far, occasionally jump if ball high
+  const dirX = ball.pos.x - bot.pos.x;
+  const dirY = ball.pos.y - bot.pos.y;
+  const dist = Math.hypot(dirX, dirY);
+  const desiredAngle = Math.atan2(dirY, dirX);
+  const angleDiff = normalizeAngle(desiredAngle - bot.angle);
+  bot.throttle = clamp(dist > 2 ? 1 : 0.2, -1, 1);
+  bot.steer = clamp(angleDiff*2, -1, 1);
+  // boost if behind and far
+  if(dist > 12 && bot.boost > 10) bot.boost = clamp(bot.boost-20*dt, 0, 100), bot.vel.x += Math.cos(bot.angle)*3*dt, bot.vel.y += Math.sin(bot.angle)*3*dt;
+  // jump logic if ball is elevated near front
+  const relX = (ball.pos.x - bot.pos.x);
+  const relY = (ball.pos.y - bot.pos.y);
+  const forward = Math.cos(bot.angle)*relX + Math.sin(bot.angle)*relY;
+  if(forward > 1 && Math.abs(angleDiff) < 0.4 && ball.pos.z > 1.2 && bot.jumpAvailable>0 && Math.random() < 0.008) {
+    bot.jump();
+  }
+}
+
+function normalizeAngle(a){
+  while(a > Math.PI) a -= Math.PI*2;
+  while(a < -Math.PI) a += Math.PI*2;
+  return a;
+}
+
+// ----------------------- Collision: sphere-sphere impulse (3D) -----------------------
+function resolveSphereSphere(a, b){
+  // a and b have pos (Vec3), vel (Vec3), mass, radius, restitution
+  const r = Vec3.sub ? null : null; // eslint ignore
+  const dx = b.pos.x - a.pos.x;
+  const dy = b.pos.y - a.pos.y;
+  const dz = b.pos.z - a.pos.z;
+  const dist = Math.hypot(dx,dy,dz) || 0.0001;
+  const penetration = (a.radius + b.radius) - dist;
+  if(penetration <= 0) return false;
+  const nx = dx/dist, ny = dy/dist, nz = dz/dist;
+  // positional correction (push apart proportionally)
+  const totalMass = a.mass + b.mass;
+  const correction = penetration + 0.001;
+  const corrA = (correction * (b.mass/totalMass));
+  const corrB = (correction * (a.mass/totalMass));
+  a.pos.x -= nx * corrA; a.pos.y -= ny * corrA; a.pos.z -= nz * corrA;
+  b.pos.x += nx * corrB; b.pos.y += ny * corrB; b.pos.z += nz * corrB;
+  // relative velocity
+  const rvx = b.vel.x - a.vel.x;
+  const rvy = b.vel.y - a.vel.y;
+  const rvz = b.vel.z - a.vel.z;
+  const relVelAlongN = rvx*nx + rvy*ny + rvz*nz;
+  // don't resolve if separating
+  if(relVelAlongN > 0) return true;
+  const e = Math.min(a.restitution || 0.2, b.restitution || 0.65);
+  const j = -(1 + e) * relVelAlongN / (1/a.mass + 1/b.mass);
+  const jx = j * nx, jy = j * ny, jz = j * nz;
+  // apply impulse
+  a.vel.x -= jx / a.mass; a.vel.y -= jy / a.mass; a.vel.z -= jz / a.mass;
+  b.vel.x += jx / b.mass; b.vel.y += jy / b.mass; b.vel.z += jz / b.mass;
+  return true;
+}
+
+// ----------------------- Boost pad update -----------------------
+function updateBoostPads(dt){
+  for(const pad of boostPads){
+    if(!pad.ready){
+      pad.respawn -= dt;
+      if(pad.respawn <= 0){ pad.ready = true; pad.respawn = 0; }
+    }
+    // check pickup by player and bot
+    const players = [player, bot];
+    for(const p of players){
+      const dx = p.pos.x - pad.x, dy = p.pos.y - pad.y;
+      const d2 = dx*dx + dy*dy;
+      const pickupR = pad.big ? 2.2 : 1.0; // meters
+      if(pad.ready && d2 <= pickupR*pickupR){
+        const amount = pad.big ? CONFIG.boostPadBig.boost : CONFIG.boostPadSmall.boost;
+        p.boost = clamp(p.boost + amount, 0, 100);
+        pad.ready = false;
+        pad.respawn = pad.big ? CONFIG.boostPadBig.respawn : CONFIG.boostPadSmall.respawn;
+        // sfx
+        AudioSys.playClick();
+      }
+    }
+  }
+}
+
+// ----------------------- Goal detection -----------------------
+const GOAL = {
+  width_m: 7.32, // goal width (approx soccer)
+  depth_m: 1.6,
+  leftLineX: -CONFIG.arena.width*0.5,
+  rightLineX: CONFIG.arena.width*0.5
+};
+
+function checkGoals(){
+  // if ball center crosses beyond left/right arena x and within goal y range
+  const gy = GOAL.width_m * 0.5;
+  if(ball.pos.x - ball.radius <= GOAL.leftLineX){
+    if(Math.abs(ball.pos.y) <= gy){
+      // goal for right team
+      scoreRight += 1;
+      onGoal('RIGHT');
+      return;
+    }
+  }
+  if(ball.pos.x + ball.radius >= GOAL.rightLineX){
+    if(Math.abs(ball.pos.y) <= gy){
+      scoreLeft += 1;
+      onGoal('LEFT');
+      return;
+    }
+  }
+}
+
+function onGoal(side){
+  // play goal SFX
+  AudioSys.playThump(1.4);
+  // increment and show
+  document.getElementById('scoreLeft').textContent = scoreLeft;
+  document.getElementById('scoreRight').textContent = scoreRight;
+  // award highscore if left or right exceed previous
+  const maxscore = Math.max(scoreLeft, scoreRight);
+  if(maxscore > highscore){ highscore = maxscore; localStorage.setItem('mini_rl_hs', String(highscore)); document.getElementById('hsVal').textContent = highscore; }
+  // reset ball to center with kickoff towards conceding side
+  ball.reset();
+  // give kickoff to conceding side (simple)
+  if(side === 'LEFT'){
+    player.reset(-1); bot.reset(1);
+    ball.pos.x = -2;
+    ball.vel.x = -5;
+  } else {
+    player.reset(-1); bot.reset(1);
+    ball.pos.x = 2;
+    ball.vel.x = 5;
+  }
+}
+
+// ----------------------- Physics loop (fixed-step) -----------------------
+const FIXED_DT = 1 / CONFIG.physicsHz;
+let accumulator = 0;
+let lastTime = nowMs();
+let debugShown = false;
+
+function physicsStep(dt){
+  // apply inputs to player
+  // handle jump input once on keydown event
+  if(Input.jump){
+    // attempt jump (consumes one jump)
+    if(player.jumpAvailable > 0 && player.jumpTimer <= 0){
+      player.jump();
+      Input.jump = false; // consume
+    }
+  }
+  // update bots (simple)
+  botAI(bot, dt);
+
+  // update boost pads (pickups)
+  updateBoostPads(dt);
+
+  // Update cars
+  player.update(dt, { throttle: Input.throttle, steer: Input.steer, boost: Input.boost });
+  bot.update(dt, { throttle: bot.throttle, steer: bot.steer, boost: false });
+
+  // ball physics
+  ball.update(dt);
+
+  // sphere-sphere collisions: ball <-> cars
+  // represent car as sphere with radius (car.radius)
+  resolveSphereSphere(ball, player);
+  resolveSphereSphere(ball, bot);
+
+  // car-car collision
+  // simple: resolve as spheres with restitution
+  resolveSphereSphere(player, bot);
+
+  // check for goals
+  checkGoals();
+}
+
+// ----------------------- Render -----------------------
+function clear(){
+  ctx.fillStyle = '#07261a';
+  ctx.fillRect(0,0,CANVAS_W, CANVAS_H);
+}
+
+function renderField(){
+  // field background
+  const fieldX = FIELD.left, fieldY = FIELD.top, fieldW = FIELD.pxW, fieldH = FIELD.pxH;
+  // grass
+  drawRoundedRect(fieldX-6, fieldY-6, fieldW+12, fieldH+12, 10, '#0a8b48', '#046a36');
+  // center rectangle
+  ctx.fillStyle = '#0db96f';
+  ctx.fillRect(fieldX, fieldY, fieldW, fieldH);
+
+  // midline
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(fieldX + fieldW/2, fieldY + 12);
+  ctx.lineTo(fieldX + fieldW/2, fieldY + fieldH - 12);
+  ctx.stroke();
+  // center circle
+  ctx.beginPath();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.arc(fieldX + fieldW/2, fieldY + fieldH/2, 56, 0, Math.PI*2);
+  ctx.stroke();
+
+  // goals (visual)
+  const goalW_px = GOAL.width_m * CONFIG.meterToPx;
+  const goalDepth_px = GOAL.depth_m * CONFIG.meterToPx;
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  // left
+  ctx.fillRect(fieldX - goalDepth_px, fieldY + (fieldH - goalW_px)/2, goalDepth_px, goalW_px);
+  // right
+  ctx.fillRect(fieldX + fieldW, fieldY + (fieldH - goalW_px)/2, goalDepth_px, goalW_px);
+
+  // draw boost pads
+  for(const pad of boostPads){
+    const c = worldToCanvas(pad.x, pad.y);
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.globalAlpha = pad.ready ? 1 : 0.35;
+    if(pad.big){
+      // big pad: circular ring
+      ctx.beginPath();
+      ctx.fillStyle = '#ffd166';
+      ctx.arc(0,0, (pad.big? 2.2:1.0)*CONFIG.meterToPx, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.fillStyle = '#a3ffb5';
+      ctx.arc(0,0, 1.0*CONFIG.meterToPx, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function renderEntityCar(car){
+  // draw car shadow (ellipse)
+  const p = worldToCanvas(car.pos.x, car.pos.y);
+  const rz = 8 + (car.pos.z*CONFIG.meterToPx*0.6);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, car.radius*CONFIG.meterToPx*0.9, rz*0.65, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // car body (top-down rotated rectangle)
+  const w = car.radius*1.6 * CONFIG.meterToPx;
+  const h = car.radius*1.0 * CONFIG.meterToPx;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(car.angle);
+  // body
+  ctx.fillStyle = car.color;
+  roundRectPath(ctx, -w*0.5, -h*0.5 - (car.pos.z*CONFIG.meterToPx*0.05), w, h, 8);
+  ctx.fill();
+  // roof stripe
+  ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  roundRectPath(ctx, -w*0.18, -h*0.22 - (car.pos.z*CONFIG.meterToPx*0.05), w*0.36, h*0.4, 4);
+  ctx.fill();
+  // boost trail (if boosting)
+  if(car.boost > 0 && (car === player && Input.boost || Math.random() < 0.002)){
+    // small trail visual behind car
+    ctx.fillStyle = 'rgba(140,220,255,0.6)';
+    ctx.beginPath();
+    ctx.ellipse(-w*0.6, 0, 6, 3, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // name
+  ctx.fillStyle = '#fff';
+  ctx.font = '12px sans-serif';
+  ctx.fillText(car.name, p.x - 18, p.y - 32 - car.pos.z*CONFIG.meterToPx*0.3);
+}
+
+function renderBall(b){
+  const p = worldToCanvas(b.pos.x, b.pos.y);
+  const r_px = b.radius * CONFIG.meterToPx;
+  // shadow
+  const shadowAlpha = clamp(0.5 - (b.pos.z/6), 0.05, 0.6);
+  ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y + 6, r_px*0.9, r_px*0.45, 0, 0, Math.PI*2);
+  ctx.fill();
+  // ball body
+  ctx.beginPath();
+  const shade = clamp(1 - b.pos.z/8, 0.6, 1.0);
+  const color = `rgba(${Math.floor(240*shade)},${Math.floor(200*shade)},${Math.floor(120*shade)},1)`;
+  ctx.fillStyle = color;
+  ctx.arc(p.x, p.y - b.pos.z*CONFIG.meterToPx*0.6, r_px, 0, Math.PI*2);
+  ctx.fill();
+  // seam
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function roundRectPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+}
+
+// main render
+function render(){
+  clear();
+  renderField();
+  renderEntityCar(player);
+  renderEntityCar(bot);
+  renderBall(ball);
+  // update UI bars
+  document.getElementById('boostFill').style.width = `${player.boost}%`;
+}
+
+// ----------------------- Fixed-step RAF loop -----------------------
+function frame(){
+  const t = nowMs();
+  let dt = (t - lastTime) / 1000;
+  lastTime = t;
+  // clamp dt for safety
+  if(dt > 0.05) dt = 0.05;
+  accumulator += dt;
+  let steps = 0;
+  while(accumulator >= FIXED_DT){
+    physicsStep(FIXED_DT);
+    accumulator -= FIXED_DT;
+    steps++;
+    if(steps > 10) { accumulator = 0; break; }
+  }
+  // render
+  render();
+
+  // debug info
+  if(debugShown){
+    const d = document.getElementById('debug');
+    d.textContent = [
+      `FPS-Frame dt: ${ (1/dt).toFixed(1) }`,
+      `player pos: ${player.pos.x.toFixed(2)}, ${player.pos.y.toFixed(2)}, z=${player.pos.z.toFixed(2)}`,
+      `player vel: ${player.vel.x.toFixed(2)}, ${player.vel.y.toFixed(2)}, zVel=${player.zVel.toFixed(2)}`,
+      `ball pos: ${ball.pos.x.toFixed(2)}, ${ball.pos.y.toFixed(2)}, z=${ball.pos.z.toFixed(2)}`,
+      `ball vel: ${ball.vel.x.toFixed(2)}, ${ball.vel.y.toFixed(2)}, ${ball.vel.z.toFixed(2)}`,
+      `score L/R: ${scoreLeft} / ${scoreRight}`
+    ].join('\n');
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ----------------------- UI & Events -----------------------
+document.getElementById('resetBtn').addEventListener('click', ()=>{ resetMatch(); AudioSys.playClick(); });
+document.getElementById('toggleDebug').addEventListener('click', ()=>{
+  debugShown = !debugShown;
+  document.getElementById('debug').style.display = debugShown ? 'block' : 'none';
+});
+
+// simple periodic check to register touches as jump presses (mobile)
+let lastTouchTime = 0;
+window.addEventListener('touchstart', (e) => {
+  lastTouchTime = Date.now();
+  //tap to boost small
+  Input.boost = true;
+  setTimeout(()=> Input.boost = false, 120);
+});
+
+// Update timer display (freeplay shows elapsed)
+let elapsed = 0;
+setInterval(()=>{
+  elapsed += 1;
+  const mm = Math.floor(elapsed/60).toString().padStart(2,'0');
+  const ss = (elapsed%60).toString().padStart(2,'0');
+  document.getElementById('timer').textContent = `${mm}:${ss}`;
+}, 1000);
+
+// Save highscore when new
+function saveHighscoreIfNeeded(){
+  const maxscore = Math.max(scoreLeft, scoreRight);
+  if(maxscore > highscore){
+    highscore = maxscore;
+    localStorage.setItem('mini_rl_hs', String(highscore));
+    document.getElementById('hsVal').textContent = highscore;
+  }
+}
+
+// small helper to convert world center origin for drawing (already used worldToCanvas)
+
+// ----------------------- Kickoff visuals & initial states -----------------------
+player.reset(-1);
+bot.reset(1);
+ball.reset();
+document.getElementById('scoreLeft').textContent = scoreLeft;
+document.getElementById('scoreRight').textContent = scoreRight;
+document.getElementById('hsVal').textContent = highscore;
+
+// light accessibility: resume audio on pointerdown due to browser policies
+window.addEventListener('pointerdown', () => {
+  try { AudioSys.ctx.resume(); } catch(e){}
+}, { once: true });
+
+</script>
+</body>
+</html>
