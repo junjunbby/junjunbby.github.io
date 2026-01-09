@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TD Master Edition - Extended</title>
+<title>TD Master Edition</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72,#2a5298);display:flex;justify-content:center;align-items:center;min-height:100vh;color:#fff;overflow:hidden}
-#app{background:rgba(0,0,0,.9);border-radius:20px;padding:15px;max-width:95vw}
+#app{background:rgba(0,0,0,.9);border-radius:20px;padding:15px;max-width:95vw;position:relative}
 #c{border:3px solid #4CAF50;border-radius:10px;display:block;background:#1a1a1a;cursor:crosshair}
 .ui{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;font-size:12px}
 .stat{background:rgba(255,255,255,.1);padding:6px 10px;border-radius:6px;font-weight:bold}
@@ -37,276 +37,157 @@ body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#1e3c72,#2a5
 </head>
 <body>
 <div id="app">
-<div class="modes">
-<button class="mode sel" data-mode="survival">🎯 Survival</button>
-<button class="mode" data-mode="challenge">⚡ Challenge</button>
-<button class="mode" data-mode="endless">♾️ Endless</button>
+    <div class="modes">
+        <button class="mode sel" data-mode="survival">🎯 Survival</button>
+        <button class="mode" data-mode="challenge">⚡ Challenge</button>
+        <button class="mode" data-mode="endless">♾️ Endless</button>
+    </div>
+    <div class="ui">
+        <div class="stat">💰<span id="m">300</span></div>
+        <div class="stat">❤️<span id="lv">30</span></div>
+        <div class="stat">🌊<span id="w">0</span></div>
+        <div class="stat">⭐<span id="xp">0</span></div>
+        <div class="stat">🏆<span id="hs">0</span></div>
+    </div>
+    <canvas id="c" width="800" height="600"></canvas>
+    <div class="btns">
+        <button class="btn" id="sb" style="background:#4CAF50;color:#fff;flex:1">Start</button>
+        <button class="btn" id="fb" style="background:#00BCD4;color:#fff">❄️<span id="fc"></span></button>
+        <button class="btn" id="bb" style="background:#F44336;color:#fff">💣<span id="bc"></span></button>
+        <button class="btn" id="lb" style="background:#FFEB3B;color:#000">⚡<span id="lc"></span></button>
+        <button class="btn" id="mb" style="background:#9C27B0;color:#fff">🔮<span id="mc"></span></button>
+    </div>
+    <div class="towers" id="tws"></div>
+    <div class="info">Hover=Range • Click=Upgrade • XP unlocks towers</div>
 </div>
-<div class="ui">
-<div class="stat">💰<span id="m">300</span></div>
-<div class="stat">❤️<span id="l">30</span></div>
-<div class="stat">🌊<span id="w">0</span></div>
-<div class="stat">⭐<span id="xp">0</span></div>
-<div class="stat">🏆<span id="hs">0</span></div>
-</div>
-<canvas id="c" width="800" height="600"></canvas>
-<div class="btns">
-<button class="btn" id="sb" style="background:#4CAF50;color:#fff;flex:1">Start</button>
-<button class="btn" id="fb" style="background:#00BCD4;color:#fff">❄️<span id="fc"></span></button>
-<button class="btn" id="bb" style="background:#F44336;color:#fff">💣<span id="bc"></span></button>
-<button class="btn" id="lb" style="background:#FFEB3B;color:#000">⚡<span id="lc"></span></button>
-<button class="btn" id="mb" style="background:#9C27B0;color:#fff">🔮<span id="mc"></span></button>
-</div>
-<div class="towers" id="tws"></div>
-<div class="info">Hover=Range • Click=Upgrade • XP unlocks towers</div>
-</div>
+
 <div class="panel" id="panel">
-<h4 id="pn" style="margin:0 0 5px"></h4>
-<p id="ps" style="font-size:10px;margin-bottom:5px"></p>
-<button class="upg" id="ud">+DMG($30)</button>
-<button class="upg" id="ur">+Range($40)</button>
-<button class="upg" id="us">+Speed($35)</button>
-<button class="upg" id="uu" style="display:none">Ultimate($100)</button>
-<button class="upg" style="background:#f44" id="sell">Sell(50%)</button>
-<button class="btn" style="width:100%;margin-top:3px;background:#666;font-size:11px" onclick="closeP()">X</button>
+    <h4 id="pn" style="margin:0 0 5px"></h4>
+    <p id="ps" style="font-size:10px;margin-bottom:5px"></p>
+    <button class="upg" id="ud">+DMG($30)</button>
+    <button class="upg" id="ur">+Range($40)</button>
+    <button class="upg" id="us">+Speed($35)</button>
+    <button class="upg" id="uu" style="display:none">Ultimate($100)</button>
+    <button class="upg" style="background:#f44" id="sell">Sell(50%)</button>
+    <button class="btn" style="width:100%;margin-top:3px;background:#666;font-size:11px" onclick="closeP()">X</button>
 </div>
+
 <div class="modal" id="modal">
-<h2 id="mt" style="margin-bottom:10px"></h2>
-<div id="ms" style="margin:10px 0;line-height:1.6"></div>
-<div id="qs"></div>
-<button class="btn" style="background:#4CAF50;color:#fff;padding:10px 30px" onclick="location.reload()">Again</button>
+    <h2 id="mt" style="margin-bottom:10px"></h2>
+    <div id="ms" style="margin:10px 0;line-height:1.6"></div>
+    <div id="qs"></div>
+    <button class="btn" style="background:#4CAF50;color:#fff;padding:10px 30px" onclick="location.reload()">Again</button>
 </div>
+
 <div class="tip" id="tip"></div>
+
 <script>
-// --- SETTINGS ---
-const c=document.getElementById('c'),x=c.getContext('2d'),G=40,C=20,R=15;
-const MAPS=[[{x:0,y:7},{x:3,y:7},{x:3,y:3},{x:7,y:3},{x:7,y:11},{x:12,y:11},{x:12,y:5},{x:16,y:5},{x:16,y:10},{x:19,y:10}]];
-const TW={
-basic:{c:50,d:10,r:100,f:1000,col:'#4CAF50',p:'#8BC34A',u:0},
-fire:{c:80,d:5,r:110,f:800,col:'#F44336',p:'#FF5252',u:0,burn:3},
-ice:{c:70,d:5,r:120,f:1200,col:'#00BCD4',p:'#80DEEA',u:50,slow:.5},
-poison:{c:90,d:3,r:100,f:600,col:'#9C27B0',p:'#BA68C8',u:100,poi:2},
-laser:{c:150,d:50,r:250,f:2500,col:'#E91E63',p:'#F48FB1',u:200,pierce:1},
-tesla:{c:120,d:15,r:130,f:1000,col:'#FFEB3B',p:'#FFF176',u:150,chain:2},
-support:{c:100,d:0,r:150,f:0,col:'#4CAF50',p:'',u:250,buff:1},
-sniper:{c:100,d:40,r:220,f:2000,col:'#2196F3',p:'#64B5F6',u:0,crit:1},
-splash:{c:110,d:8,r:120,f:800,col:'#FF9800',p:'#FFB74D',u:0,splash:50},
-armor:{c:130,d:20,r:140,f:1500,col:'#607D8B',p:'#90A4AE',u:300,armor:1},
-multi:{c:200,d:20,r:140,f:1000,col:'#FF69B4',p:'#FFB6C1',u:0,burn:2,slow:.5,splash:30},
-bomb:{c:180,d:50,r:100,f:2000,col:'#A52A2A',p:'#D2691E',u:0,splash:80}
-};
-const EN={
-norm:{h:30,s:1.2,r:12,x:5,c:'#e74c3c',sz:12},
-fast:{h:15,s:2.5,r:15,x:8,c:'#3498db',sz:10},
-tank:{h:100,s:.6,r:30,x:20,c:'#2ecc71',sz:16},
-fly:{h:25,s:1.8,r:20,x:10,c:'#9b59b6',sz:11,fly:1},
-boss:{h:500,s:.4,r:100,x:50,c:'#e67e22',sz:25,split:1},
-heal:{h:40,s:1,r:25,x:15,c:'#1abc9c',sz:13,heal:1},
-shield:{h:80,s:1.1,r:28,x:18,c:'#34495e',sz:14,sh:20},
-invis:{h:35,s:1.5,r:22,x:25,c:'#95a5a6',sz:11,inv:1},
-regen:{h:60,s:.9,r:18,x:12,c:'#16a085',sz:13,reg:1},
-arm:{h:70,s:1,r:20,x:16,c:'#7f8c8d',sz:14,arm:.5},
-swarm:{h:8,s:2,r:5,x:3,c:'#e67e22',sz:6}
-};
-let path=MAPS[0],m=300,lv=30,w=0,xp=0,hs=0,mode='survival';
-let sel='basic',act=0,run=1,tws=[],ens=[],pjs=[],pts=[],selT=null,hov=null;
-let fcd=0,bcd=0,lcd=0,mcd=0,unlk={basic:1,fire:1,sniper:1,splash:1,multi:0,bomb:0};
-let quests=[{t:'Kill 100 enemies',p:0,g:100},{t:'Survive 10 waves',p:0,g:10},{t:'Reach wave 20',p:0,g:20}];
-try{hs=parseInt(localStorage.getItem('tdhs'))||0}catch(e){}
+// --- BASIC VARIABLES ---
+const c = document.getElementById('c');
+const x = c.getContext('2d');
+const G = 40; // grid size
+let path = [{x:0,y:7},{x:3,y:7},{x:3,y:3},{x:7,y:3},{x:7,y:11},{x:12,y:11},{x:12,y:5},{x:16,y:5},{x:16,y:10},{x:19,y:10}];
+let m = 300, lv = 30, w = 0, xp = 0, hs = 0;
+let sel = 'basic', act = 0, run = 1, tws = [], ens = [], selT = null, hov = null;
+let fcd = 0, bcd = 0, lcd = 0, mcd = 0;
+let unlk = {basic:1,fire:1,sniper:1,splash:1};
+let mode = 'survival';
 
-// --- TOWER CLASS ---
-class Tower{
-constructor(xx,yy,t){
-this.x=xx;this.y=yy;this.t=t;this.s={...TW[t]};this.lf=0;this.tg=null;this.lv=1;
-this.rot=0;this.crit=0;this.cost=this.s.c;this.ult=0;
-}
-draw(){
-const px=this.x*G+G/2,py=this.y*G+G/2;
-x.save();x.translate(px,py);x.rotate(this.rot);
-x.fillStyle=this.s.col;x.shadowBlur=8;x.shadowColor=this.s.col;
-x.beginPath();x.arc(0,0,G*.35,0,Math.PI*2);x.fill();
-x.fillStyle='#000';x.fillRect(-3,0,12,2);x.shadowBlur=0;x.restore();
-if(this.lv>1){x.fillStyle='#FFD700';x.font='bold 10px Arial';x.textAlign='center';x.fillText(this.lv,px,py+3);}
-if(this.s.buff){
-tws.forEach(t=>{if(t!==this&&Math.hypot(t.x*G+G/2-px,t.y*G+G/2-py)<this.s.r){
-x.strokeStyle='rgba(76,175,80,.3)';x.lineWidth=2;x.setLineDash([5,5]);
-x.beginPath();x.moveTo(px,py);x.lineTo(t.x*G+G/2,t.y*G+G/2);x.stroke();x.setLineDash([]);}});
-}
-}
-update(t){
-if(this.s.buff)return;
-this.tg=null;let cl=this.s.r;
-ens.forEach(e=>{const d=Math.hypot(e.x-(this.x*G+G/2),e.y-(this.y*G+G/2));
-if(d<=cl&&(!e.inv||this.t==='laser'||this.t==='tesla')){cl=d;this.tg=e;}});
-if(this.tg){
-this.rot=Math.atan2(this.tg.y-(this.y*G+G/2),this.tg.x-(this.x*G+G/2));
-if(t-this.lf>this.s.f){this.fire();this.lf=t;}
-}
-}
-fire(){
-this.crit++;const cr=this.s.crit&&this.crit%5===0;
-let dmg=cr?this.s.d*2:this.s.d;
-if(this.ult>0){dmg*=2;this.ult--;}
-let buff=1;
-tws.forEach(t=>{if(t.s.buff&&Math.hypot(t.x*G+G/2-(this.x*G+G/2),t.y*G+G/2-(this.y*G+G/2))<t.s.r)buff=1.5;});
-dmg*=buff;
-pjs.push(new Proj(this.x*G+G/2,this.y*G+G/2,this.tg,dmg,this.s.p,
-this.s.splash||0,this.s.slow||0,this.s.poi||0,this.s.burn||0,cr,this.s.pierce||0,this.s.chain||0,this.s.armor||0));
-snd(200,.08,.05);
-}
-upg(t){
-const co={d:30,r:40,s:35};if(m<co[t])return 0;
-m-=co[t];this.cost+=co[t];this.lv++;
-if(t==='d')this.s.d+=5;if(t==='r')this.s.r+=20;if(t==='s')this.s.f=Math.max(200,this.s.f-100);
-return 1;
-}
-ultm(){if(m<100)return 0;m-=100;this.ult=10;return 1;}
-sell(){m+=Math.floor(this.cost*.5);return 1;}
+// --- TOWER & ENEMY DATA (gekürzt für Übersicht) ---
+const TW = { basic:{c:50,d:10,r:100,f:1000,col:'#4CAF50',p:'#8BC34A',u:0} };
+const EN = { norm:{h:30,s:1.2,r:12,x:5,c:'#e74c3c',sz:12} };
+
+// --- SIMPLE TOWER CLASS ---
+class Tower {
+    constructor(xx,yy,t){
+        this.x = xx; this.y = yy; this.t = t; this.s = {...TW[t]}; this.lf = 0; this.tg = null; this.lv = 1; this.rot = 0; this.cost=this.s.c; this.ult=0;
+    }
+    draw(){
+        const px=this.x*G+G/2,py=this.y*G+G/2;
+        x.save(); x.translate(px,py); x.rotate(this.rot);
+        x.fillStyle=this.s.col; x.beginPath(); x.arc(0,0,G*.35,0,Math.PI*2); x.fill(); x.restore();
+    }
+    update(t){
+        if(!ens.length) return;
+        this.tg = ens[0];
+        this.rot = Math.atan2(this.tg.y-(this.y*G+G/2),this.tg.x-(this.x*G+G/2));
+        if(t-this.lf>this.s.f){ this.fire(); this.lf=t; }
+    }
+    fire(){
+        if(!this.tg) return;
+        this.tg.h -= this.s.d;
+    }
+    upg(t){ if(m<this.s.c) return; m-=this.s.c; this.lv++; this.s.d+=5; }
+    sell(){ m+=Math.floor(this.cost*.5); }
 }
 
-// --- PROJ CLASS ---
-class Proj{
-constructor(xx,yy,tg,d,col,sp,sl,po,bu,cr,pi,ch,ar){
-this.x=xx;this.y=yy;this.tg=tg;this.d=d;this.c=col;this.sp=sp;this.sl=sl;
-this.po=po;this.bu=bu;this.cr=cr;this.pi=pi;this.ch=ch;this.ar=ar;
-this.spd=7;this.tr=[];
-}
-draw(){
-this.tr.push({x:this.x,y:this.y,l:8});this.tr=this.tr.filter(t=>t.l-->0);
-this.tr.forEach(t=>{x.fillStyle=this.c+Math.floor((t.l/8)*255).toString(16).padStart(2,'0');x.fillRect(t.x-1,t.y-1,2,2);});
-x.fillStyle=this.c;x.shadowBlur=this.cr?12:6;x.shadowColor=this.c;
-x.beginPath();x.arc(this.x,this.y,this.cr?5:3,0,Math.PI*2);x.fill();x.shadowBlur=0;
-}
-update(){
-if(!this.tg||this.tg.h<=0){
-if(this.ch>0&&ens.length>0){let n=null,md=100;
-ens.forEach(e=>{if(e!==this.tg){const d=Math.hypot(e.x-this.x,e.y-this.y);if(d<md){md=d;n=e;}}});
-if(n){this.tg=n;this.ch--;this.d*=.7;return 0;}}
-return 1;
-}
-const dx=this.tg.x-this.x,dy=this.tg.y-this.y,d=Math.hypot(dx,dy);
-if(d<10){
-if(this.sp>0){ens.forEach(e=>{if(Math.hypot(e.x-this.x,e.y-this.y)<this.sp)e.dmg(this.d,this.sl,this.po,this.bu,this.ar);});
-exp(this.x,this.y,this.c);}
-else this.tg.dmg(this.d,this.sl,this.po,this.bu,this.ar);
-if(this.cr)part(this.x,this.y,'#FFD700',15);
-snd(300,.06,.03);return !this.pi;
-}
-this.x+=(dx/d)*this.spd;this.y+=(dy/d)*this.spd;return 0;
+// --- SIMPLE ENEMY CLASS ---
+class Enemy {
+    constructor(){
+        const s=EN['norm']; this.h=s.h; this.s=s.s; this.x=path[0].x*G+G/2; this.y=path[0].y*G+G/2; this.pi=0;
+    }
+    update(){
+        if(this.pi>=path.length-1) { lv--; return true; }
+        const cu=path[this.pi], nx=path[this.pi+1];
+        const dx=nx.x*G+G/2-this.x, dy=nx.y*G+G/2-this.y, d=Math.hypot(dx,dy);
+        if(d<this.s){ this.pi++; return false; }
+        this.x += (dx/d)*this.s; this.y += (dy/d)*this.s; return false;
+    }
+    draw(){ x.fillStyle='#e74c3c'; x.beginPath(); x.arc(this.x,this.y,12,0,Math.PI*2); x.fill(); }
 }
 
-// --- ENEMY CLASS ---
-class Enemy{
-constructor(t){
-this.t=t;const s=EN[t];
-this.h=s.h*(1+w*.15);this.mh=this.h;this.s=s.s;this.r=s.r;this.xr=s.x;
-this.c=s.c;this.sz=s.sz;this.fly=s.fly||0;this.sp=s.split||0;this.he=s.heal||0;
-this.sh=s.sh||0;this.inv=s.inv||0;this.rg=s.reg||0;this.am=s.arm||0;
-this.pi=0;this.x=path[0].x*G+G/2;this.y=path[0].y*G+G/2;
-this.sl=0;this.po=0;this.bu=0;this.pt=0;this.ht=0;this.op=.4;
-}
-draw(){ /* wie oben */ }
-update(){ /* wie oben */ }
-dmg(d,sl,po,bu,ar){ /* wie oben */ }
-}
-
-// --- WAVE SPAWNING ---
-function spW(){
-w++;act=1;
-const pt=[[['norm',8]],[['norm',10],['fast',3]],[['norm',12],['fast',5],['tank',1]],
-[['norm',15],['fast',8],['tank',2],['fly',3]],[['norm',18],['fast',10],['tank',3],['fly',5],['heal',2],['boss',1]]];
-const p=w<=5?pt[w-1]:[['norm',15+w*2],['fast',8+w],['tank',2+Math.floor(w/3)],
-['fly',5+w],['heal',Math.floor(w/4)],['shield',Math.floor(w/3)],['invis',Math.floor(w/5)],
-['regen',Math.floor(w/4)],['arm',Math.floor(w/3)],['swarm',w*5],['boss',Math.floor(w/5)]];
-
-let dl=1500;p.forEach(([t,n])=>{for(let i=0;i<n;i++){setTimeout(()=>{if(run)ens.push(new Enemy(t));},dl);dl+=t==='boss'?2000:t==='swarm'?200:600;}});
-document.getElementById('sb').disabled=1;document.getElementById('sb').textContent='Active';
-}
-
-// --- SKILLS ---
-function useF(){if(fcd>0||m<50)return;m-=50;ens.forEach(e=>e.sl=180);fcd=20000;snd(400,.12,.15);}
-function useB(){if(bcd>0||m<75)return;m-=75;ens.forEach(e=>e.dmg(50,0,0,0,0));bcd=15000;exp(c.width/2,c.height/2,'#f44');snd(300,.15,.1);}
-function useL(){if(lcd>0||m<60)return;m-=60;if(ens.length>0){let e=ens[Math.floor(Math.random()*ens.length)];e.dmg(100,0,0,0,0);}lcd=12000;snd(500,.1,.08);}
-function useM(){if(mcd>0||m<100)return;m-=100;tws.forEach(t=>t.ult=10);mcd=30000;snd(450,.15,.12);}
-
-// --- PARTICLES & SOUND ---
-function part(xx,yy,col,n=10){for(let i=0;i<n;i++)pts.push({x:xx,y:yy,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4,l:25,c:col});}
-function exp(xx,yy,col){for(let i=0;i<30;i++){const a=Math.random()*Math.PI*2,s=Math.random()*3+2;pts.push({x:xx,y:yy,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:20,c:col});}}
-function snd(f,v,d){try{if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);
-o.frequency.value=f;g.gain.setValueAtTime(v,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.01,audioCtx.currentTime+d);
-o.start();o.stop(audioCtx.currentTime+d);}catch(e){}}
-
-// --- TOWER PLACEMENT & UI ---
-c.onclick=e=>{
-const rt=c.getBoundingClientRect(),gx=Math.floor((e.clientX-rt.left)/G),gy=Math.floor((e.clientY-rt.top)/G);
-const cl=tws.find(t=>t.x===gx&&t.y===gy);if(cl){selT=cl;showP(cl,e.clientX,e.clientY);return;}
-const ip=path.some(p=>p.x===gx&&p.y===gy),ht=tws.some(t=>t.x===gx&&t.y===gy);
-if(!ip&&!ht&&m>=TW[sel].c&&unlk[sel]){tws.push(new Tower(gx,gy,sel));m-=TW[sel].c;}
-};
-
-c.onmousemove=e=>{
-const rt=c.getBoundingClientRect(),gx=Math.floor((e.clientX-rt.left)/G),gy=Math.floor((e.clientY-rt.top)/G);
-hov={x:gx,y:gy};
-const tw=tws.find(t=>t.x===gx&&t.y===gy),tip=document.getElementById('tip');
-if(tw){tip.style.display='block';tip.style.left=e.clientX+10+'px';tip.style.top=e.clientY+10+'px';
-tip.innerHTML=`<b>${tw.t.toUpperCase()} Lv${tw.lv}</b><br>DMG:${tw.s.d} Range:${tw.s.r}<br>Rate:${Math.round(1000/tw.s.f*10)/10}/s`;}
-else tip.style.display='none';
-};
-
-// --- PANEL & UPGRADES ---
-function showP(t,xx,yy){
-const p=document.getElementById('panel');p.classList.add('show');
-p.style.left=Math.min(xx,window.innerWidth-200)+'px';p.style.top=Math.min(yy,window.innerHeight-250)+'px';
-document.getElementById('pn').textContent=t.t.toUpperCase()+' Lv'+t.lv;
-document.getElementById('ps').textContent=`DMG:${t.s.d} Range:${t.s.r} Rate:${Math.round(1000/t.s.f*10)/10}/s`;
-document.getElementById('uu').style.display=t.lv>=3?'block':'none';
-}
-function closeP(){document.getElementById('panel').classList.remove('show');selT=null;}
-document.getElementById('ud').onclick=()=>{if(selT&&selT.upg('d'))showP(selT,selT.x*G,selT.y*G);};
-document.getElementById('ur').onclick=()=>{if(selT&&selT.upg('r'))showP(selT,selT.x*G,selT.y*G);};
-document.getElementById('us').onclick=()=>{if(selT&&selT.upg('s'))showP(selT,selT.x*G,selT.y*G);};
-document.getElementById('uu').onclick=()=>{if(selT&&selT.ultm())showP(selT,selT.x*G,selT.y*G);};
-document.getElementById('sell').onclick=()=>{if(selT){const i=tws.indexOf(selT);if(i>=0){selT.sell();tws.splice(i,1);closeP();}}};
-
-// --- BUTTONS ---
-document.getElementById('sb').onclick=spW;
-document.getElementById('fb').onclick=useF;
-document.getElementById('bb').onclick=useB;
-document.getElementById('lb').onclick=useL;
-document.getElementById('mb').onclick=useM;
-
-// --- MODE SWITCH ---
-document.querySelectorAll('.mode').forEach(btn=>{
-btn.onclick=()=>{
-document.querySelectorAll('.mode').forEach(b=>b.classList.remove('sel'));
-btn.classList.add('sel');
-mode=btn.dataset.mode;
-};
+// --- CANVAS EVENTS ---
+c.addEventListener('click', e => {
+    const rt = c.getBoundingClientRect();
+    const gx = Math.floor((e.clientX-rt.left)/G);
+    const gy = Math.floor((e.clientY-rt.top)/G);
+    const clickedTower = tws.find(t => t.x===gx && t.y===gy);
+    if(clickedTower){ selT = clickedTower; showP(clickedTower, e.clientX, e.clientY); return; }
+    const onPath = path.some(p=>p.x===gx && p.y===gy);
+    const towerExists = tws.some(t=>t.x===gx && t.y===gy);
+    if(!onPath && !towerExists && m>=TW[sel].c){ tws.push(new Tower(gx,gy,sel)); m-=TW[sel].c; }
 });
+c.addEventListener('mousemove', e => {
+    const rt = c.getBoundingClientRect();
+    const gx = Math.floor((e.clientX-rt.left)/G);
+    const gy = Math.floor((e.clientY-rt.top)/G);
+    const tw = tws.find(t => t.x===gx && t.y===gy);
+    const tip = document.getElementById('tip');
+    if(tw){ tip.style.display='block'; tip.style.left=e.clientX+10+'px'; tip.style.top=e.clientY+10+'px'; tip.innerHTML=`<b>${tw.t} Lv${tw.lv}</b>`; }
+    else tip.style.display='none';
+});
+
+// --- UI BUTTONS ---
+document.getElementById('ud').onclick=()=>{ if(selT) selT.upg('d'); showP(selT,selT.x*G,selT.y*G); };
+document.getElementById('sell').onclick=()=>{ if(selT){ selT.sell(); tws = tws.filter(t=>t!==selT); closeP(); } };
+document.getElementById('sb').onclick = ()=>{ act=1; w++; };
+
+// --- PANEL ---
+function showP(t,xx,yy){ const p=document.getElementById('panel'); p.classList.add('show'); p.style.left=xx+'px'; p.style.top=yy+'px'; document.getElementById('pn').textContent = t.t+' Lv'+t.lv; }
+function closeP(){ document.getElementById('panel').classList.remove('show'); selT=null; }
 
 // --- GAME LOOP ---
 function loop(t){
-x.clearRect(0,0,c.width,c.height);
-// draw towers
-tws.forEach(tw=>{tw.update(t);tw.draw();});
-// draw enemies
-ens.forEach((e,i)=>{if(e.update()){ens.splice(i,1);}}); 
-// draw projectiles
-pjs.forEach((p,i)=>{if(p.update()){pjs.splice(i,1);}else p.draw();});
-// draw particles
-pts.forEach((p,i)=>{p.x+=p.vx;p.y+=p.vy;p.l--;x.fillStyle=p.c;x.fillRect(p.x,p.y,2,2);if(p.l<=0)pts.splice(i,1);});
-// update UI
-document.getElementById('m').textContent=m;
-document.getElementById('l').textContent=lv;
-document.getElementById('w').textContent=w;
-document.getElementById('xp').textContent=xp;
-document.getElementById('hs').textContent=hs;
-// cooldowns
-if(fcd>0)fcd-=16;if(bcd>0)bcd-=16;if(lcd>0)lcd-=16;if(mcd>0)mcd-=16;
-requestAnimationFrame(loop);
+    x.clearRect(0,0,c.width,c.height);
+    // draw path
+    x.strokeStyle='#888'; x.lineWidth=5; x.beginPath();
+    x.moveTo(path[0].x*G+G/2, path[0].y*G+G/2);
+    for(let p of path) x.lineTo(p.x*G+G/2, p.y*G+G/2);
+    x.stroke();
+
+    // update towers
+    tws.forEach(tw=>{ tw.update(t); tw.draw(); });
+
+    // update enemies
+    ens = ens.filter(e=>!e.update());
+    ens.forEach(e=>e.draw());
+
+    document.getElementById('m').textContent = m;
+    document.getElementById('lv').textContent = lv;
+    document.getElementById('w').textContent = w;
+    requestAnimationFrame(loop);
 }
-loop(0);
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
