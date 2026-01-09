@@ -1,1 +1,890 @@
-...
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini FPS MVP — Browser (WebGL)</title>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel: rgba(255,255,255,0.04);
+    --accent:#40c4ff;
+    --ui:#e6eef7;
+  }
+  html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--ui);}
+  #root{position:relative;height:100vh;overflow:hidden;display:flex;align-items:stretch;}
+  canvas#gl{flex:1;display:block;background:#334;outline:none;}
+  .hud {
+    position:absolute;left:0;right:0;top:0;pointer-events:none;
+    display:flex;justify-content:space-between;padding:12px;
+  }
+  .panel { pointer-events:auto;background:var(--panel);padding:8px 10px;border-radius:8px;color:var(--ui);font-weight:600 }
+  .centerHud { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;text-align:center; }
+  .crosshair { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2px;height:2px;background:rgba(255,255,255,0.9); }
+  .bottomHud { position:absolute;left:50%;bottom:12px;transform:translateX(-50%);pointer-events:none;display:flex;gap:10px;align-items:center; }
+  .small{font-size:13px;color:rgba(255,255,255,0.85)}
+  #minimap { position:absolute;right:12px;bottom:12px;width:160px;height:160px;background:rgba(0,0,0,0.45);border-radius:8px;padding:6px;pointer-events:none; }
+  button { background:var(--accent); border:none;padding:6px 10px;border-radius:6px;color:#012;cursor:pointer;font-weight:700 }
+  .secondary { background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--ui) }
+  #menu { position:absolute;left:12px;top:72px;pointer-events:auto; }
+  #debug { position:absolute;left:12px;top:12px;color:#bfe; background:rgba(0,0,0,0.25);padding:6px;border-radius:6px;font-size:12px }
+  @media (max-width:720px){
+    #minimap{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="root">
+  <canvas id="gl" width="1280" height="720" tabindex=0></canvas>
+
+  <div class="hud" id="hudTop">
+    <div class="panel small" id="leftPanel">Health: <span id="hp">100</span></div>
+    <div class="panel small" id="rightPanel">Ammo: <span id="ammo">12</span> / <span id="reserve">36</span></div>
+  </div>
+
+  <div id="debug">Loading...</div>
+
+  <div class="centerHud">
+    <div style="font-size:20px;font-weight:800">Mini FPS MVP</div>
+    <div class="small" style="margin-top:6px">Pointer-lock & Mouse to look • WASD to move • Shift sprint • Space jump • R reload</div>
+  </div>
+
+  <div class="crosshair" id="crosshair"></div>
+
+  <div class="bottomHud">
+    <div class="panel small" id="scorePanel">Kills: <span id="kills">0</span></div>
+    <div class="panel small" id="weaponPanel">Weapon: <span id="wname">Pistol</span></div>
+    <div class="panel small" id="statusPanel">Mode: Freeplay • Bots: <span id="botCount">3</span></div>
+  </div>
+
+  <div id="minimap"></div>
+
+  <div id="menu" style="display:flex;flex-direction:column;gap:8px">
+    <button id="startBtn">Start</button>
+    <button id="toggleDebugBtn" class="secondary">Toggle Debug</button>
+    <button id="addBotBtn" class="secondary">+ Bot</button>
+  </div>
+</div>
+
+<script>
+/*
+Mini FPS MVP (single-file)
+- WebGL rendering for simple colored boxes and a sphere-bot.
+- First-person controls (pointer lock), WASD movement, sprint, jump.
+- Hitscan pistol with recoil, ammo, reload.
+- Simple AI bots that patrol waypoints and shoot at the player when in LOS.
+- Collision: simple cylinder collision in XZ plane against AABB obstacles (no full capsule-triangle).
+- Fixed-step update loop for physics/AI, render interpolation.
+- WebAudio for simple firing and hit sounds.
+- LocalStorage to store a "best kills" highscore.
+This is a compact, fully-browser prototype — intended as a starting point aligning to the detailed blueprint.
+*/
+
+/* -------------------- Utilities (vec/mat small lib) -------------------- */
+function nowMs(){ return performance.now(); }
+const TAU = Math.PI * 2;
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function degToRad(d){ return d * Math.PI / 180; }
+
+class Vec3 {
+  constructor(x=0,y=0,z=0){ this.x=x; this.y=y; this.z=z; }
+  set(x,y,z){ this.x=x; this.y=y; this.z=z; return this; }
+  copy(){ return new Vec3(this.x,this.y,this.z); }
+  add(v){ this.x+=v.x; this.y+=v.y; this.z+=v.z; return this; }
+  sub(v){ this.x-=v.x; this.y-=v.y; this.z-=v.z; return this; }
+  mul(s){ this.x*=s; this.y*=s; this.z*=s; return this; }
+  length(){ return Math.hypot(this.x,this.y,this.z); }
+  normalize(){ const L=this.length()||1; this.x/=L; this.y/=L; this.z/=L; return this; }
+  static dot(a,b){ return a.x*b.x + a.y*b.y + a.z*b.z; }
+  static sub(a,b){ return new Vec3(a.x-b.x,a.y-b.y,a.z-b.z); }
+}
+
+/* Minimal 4x4 matrix helpers for view/proj */
+const Mat4 = {
+  identity: function(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); },
+  multiply: function(a,b){
+    const out = new Float32Array(16);
+    for(let i=0;i<4;i++){
+      for(let j=0;j<4;j++){
+        let s=0;
+        for(let k=0;k<4;k++) s += a[k*4 + j] * b[i*4 + k];
+        out[i*4 + j] = s;
+      }
+    }
+    return out;
+  },
+  perspective: function(fov, aspect, near, far){
+    const f = 1.0 / Math.tan(fov/2);
+    const nf = 1/(near - far);
+    const out = new Float32Array(16);
+    out[0] = f/aspect; out[1]=0; out[2]=0; out[3]=0;
+    out[4]=0; out[5]=f; out[6]=0; out[7]=0;
+    out[8]=0; out[9]=0; out[10]=(far+near)*nf; out[11]=-1;
+    out[12]=0; out[13]=0; out[14]=(2*far*near)*nf; out[15]=0;
+    return out;
+  },
+  lookAt: function(eye, center, up){
+    const z0 = eye.x - center.x, z1=eye.y-center.y, z2=eye.z-center.z;
+    let len = Math.hypot(z0,z1,z2) || 1;
+    const zx = z0/len, zy=z1/len, zz=z2/len;
+    const xx = up.y*zz - up.z*zy, xy = up.z*zx - up.x*zz, xz = up.x*zy - up.y*zx;
+    len = Math.hypot(xx,xy,xz) || 1;
+    const ux = xx/len, uy=xy/len, uz=xz/len;
+    const vx = zy*uz - zz*uy, vy = zz*ux - zx*uz, vz = zx*uy - zy*ux;
+    const out = new Float32Array(16);
+    out[0]=ux; out[1]=vx; out[2]=zx; out[3]=0;
+    out[4]=uy; out[5]=vy; out[6]=zy; out[7]=0;
+    out[8]=uz; out[9]=vz; out[10]=zz; out[11]=0;
+    out[12]= -(ux*eye.x + uy*eye.y + uz*eye.z);
+    out[13]= -(vx*eye.x + vy*eye.y + vz*eye.z);
+    out[14]= -(zx*eye.x + zy*eye.y + zz*eye.z);
+    out[15]=1;
+    return out;
+  }
+};
+
+/* -------------------- WebGL helpers -------------------- */
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+if(!gl){ alert('WebGL not supported'); throw new Error('WebGL not supported'); }
+
+function compileShader(src, type){
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); throw new Error('Shader compile error'); }
+  return s;
+}
+function createProgram(vsSrc, fsSrc){
+  const vs = compileShader(vsSrc, gl.VERTEX_SHADER);
+  const fs = compileShader(fsSrc, gl.FRAGMENT_SHADER);
+  const p = gl.createProgram(); gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+  if(!gl.getProgramParameter(p, gl.LINK_STATUS)){ console.error(gl.getProgramInfoLog(p)); throw new Error('Program link error'); }
+  return p;
+}
+
+/* Basic lambert shader (pos, normal, color uniform) */
+const vs = `#version 300 es
+in vec3 aPos;
+in vec3 aNormal;
+uniform mat4 uModel;
+uniform mat4 uView;
+uniform mat4 uProj;
+out vec3 vNormal;
+out vec3 vPos;
+void main(){
+  vNormal = mat3(uModel) * aNormal;
+  vPos = (uModel * vec4(aPos,1.0)).xyz;
+  gl_Position = uProj * uView * vec4(vPos,1.0);
+}`;
+const fs = `#version 300 es
+precision highp float;
+in vec3 vNormal; in vec3 vPos;
+uniform vec3 uColor;
+uniform vec3 uLightDir;
+out vec4 outColor;
+void main(){
+  vec3 N = normalize(vNormal);
+  float lam = max(dot(N, -uLightDir), 0.0) * 0.9 + 0.1;
+  vec3 col = uColor * lam;
+  outColor = vec4(col,1.0);
+}`;
+
+/* Create program & attributes */
+const program = createProgram(vs, fs);
+const attribPos = gl.getAttribLocation(program, 'aPos');
+const attribNormal = gl.getAttribLocation(program, 'aNormal');
+const uniModel = gl.getUniformLocation(program, 'uModel');
+const uniView = gl.getUniformLocation(program, 'uView');
+const uniProj = gl.getUniformLocation(program, 'uProj');
+const uniColor = gl.getUniformLocation(program, 'uColor');
+const uniLight = gl.getUniformLocation(program, 'uLightDir');
+
+/* Basic cube geometry (unit cube centered at origin) */
+const cubeVerts = new Float32Array([
+  // positions        // normals
+  -0.5,-0.5,-0.5,     0,0,-1,
+   0.5,-0.5,-0.5,     0,0,-1,
+   0.5, 0.5,-0.5,     0,0,-1,
+  -0.5, 0.5,-0.5,     0,0,-1,
+  -0.5,-0.5, 0.5,     0,0,1,
+   0.5,-0.5, 0.5,     0,0,1,
+   0.5, 0.5, 0.5,     0,0,1,
+  -0.5, 0.5, 0.5,     0,0,1,
+  -0.5,-0.5,-0.5,    -1,0,0,
+  -0.5, 0.5,-0.5,    -1,0,0,
+  -0.5, 0.5, 0.5,    -1,0,0,
+  -0.5,-0.5, 0.5,    -1,0,0,
+   0.5,-0.5,-0.5,     1,0,0,
+   0.5, 0.5,-0.5,     1,0,0,
+   0.5, 0.5, 0.5,     1,0,0,
+   0.5,-0.5, 0.5,     1,0,0,
+  -0.5,-0.5,-0.5,     0,-1,0,
+  -0.5,-0.5, 0.5,     0,-1,0,
+   0.5,-0.5, 0.5,     0,-1,0,
+   0.5,-0.5,-0.5,     0,-1,0,
+  -0.5, 0.5,-0.5,     0,1,0,
+  -0.5, 0.5, 0.5,     0,1,0,
+   0.5, 0.5, 0.5,     0,1,0,
+   0.5, 0.5,-0.5,     0,1,0,
+]);
+const cubeIdx = new Uint16Array([
+  0,1,2, 0,2,3,   4,6,5, 4,7,6,
+  8,9,10,8,10,11, 12,14,13,12,15,14,
+  16,17,18,16,18,19, 20,22,21,20,23,22
+]);
+
+const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+const vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, cubeVerts, gl.STATIC_DRAW);
+const ibo = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, cubeIdx, gl.STATIC_DRAW);
+gl.enableVertexAttribArray(attribPos); gl.vertexAttribPointer(attribPos, 3, gl.FLOAT, false, 24, 0);
+gl.enableVertexAttribArray(attribNormal); gl.vertexAttribPointer(attribNormal, 3, gl.FLOAT, false, 24, 12);
+gl.bindVertexArray(null);
+
+/* GL state */
+gl.enable(gl.DEPTH_TEST);
+gl.clearColor(0.06,0.08,0.10,1);
+
+/* -------------------- Simple scene definition -------------------- */
+/* Map: floor plane + room of boxes (AABB obstacles) */
+const MAP = {
+  bounds: { x:-20, z:-30, w:40, d:60 }, // x,z plane extents
+  obstacles: [
+    // Each obstacle is {x,z,w,d,h,color}
+    {x: -6, z: -4, w: 4, d: 8, h: 2.6, color:[0.6,0.6,0.6]},
+    {x: 6, z: 6, w: 6, d: 4, h: 2.6, color:[0.5,0.4,0.4]},
+    {x: 0, z: 14, w: 12, d: 6, h: 2.6, color:[0.35,0.6,0.45]},
+    {x: -12, z: 20, w: 4, d: 8, h: 2.6, color:[0.7,0.6,0.4]},
+    {x: 12, z: -12, w: 6, d: 6, h: 2.6, color:[0.45,0.45,0.7]},
+  ],
+  spawnPoints: [
+    {x: -12, z: -18}, {x:12,z: -18}, {x:0,z: 18}, {x: -14, z: 6}, {x: 14, z: 6}
+  ]
+};
+
+/* Scale world to meters; our rendering uses meters as units directly for matrix transforms */
+
+/* -------------------- Player state & controller -------------------- */
+const Player = {
+  pos: new Vec3(0, 0, -8),   // x,y,z (y used for vertical eye height)
+  vel: new Vec3(0,0,0),
+  yaw: 0, pitch: 0,
+  eyeHeight: 1.6,            // meters
+  radius: 0.35,              // collision cylinder radius
+  speed: 5.4,                // walk m/s
+  sprintSpeed: 7.2,
+  accel: 14,
+  onGround: true,
+  yVel: 0,
+  jumpImpulse: 4.43,
+  health: 100,
+  maxHealth: 100,
+  kills: 0,
+  weapon: {
+    id: 'pistol', mag: 12, magMax:12, reserve:36, rpm:400, reloadTime:1.6, lastShot:0, fireCooldown:0,
+    recoil:{pitch:0.06,yaw:0.03}, spreadDeg:1.2
+  },
+  recoilState:{pitch:0,yaw:0},
+  isReloading:false
+};
+
+/* -------------------- Simple Bot implementation -------------------- */
+class Bot {
+  constructor(id, x,z){
+    this.id = id;
+    this.pos = new Vec3(x,0,z);
+    this.radius = 0.35;
+    this.health = 100;
+    this.alive = true;
+    this.waypoints = Bot.makeWaypoints(x,z);
+    this.wpIndex = 0;
+    this.speed = 3.2;
+    this.lastShot = 0;
+    this.reactTimer = 0;
+    this.color = [0.9,0.5,0.5];
+  }
+  static makeWaypoints(cx,cz){
+    // small local patrol near spawn
+    return [
+      {x: cx, z: cz},
+      {x: cx + (Math.random()*6-3), z: cz + (Math.random()*6-3)},
+      {x: cx + (Math.random()*6-3), z: cz + (Math.random()*6-3)}
+    ];
+  }
+  respawn(spawn){
+    this.pos.set(spawn.x,0,spawn.z);
+    this.health = 100;
+    this.alive = true;
+    this.wpIndex = 0;
+  }
+}
+
+/* allow dynamic bots list */
+let bots = [];
+function addBot(){
+  const sp = MAP.spawnPoints[bots.length % MAP.spawnPoints.length];
+  const b = new Bot(bots.length+1, sp.x, sp.z);
+  bots.push(b);
+  document.getElementById('botCount').textContent = bots.length;
+}
+for(let i=0;i<3;i++) addBot();
+
+/* -------------------- Simple collision helpers (XZ plane cylinder vs AABB) -------------------- */
+function circleAABBOverlap(cx, cz, r, box){
+  // box: has x,z (center), w,d (extent half width used), returns true if horizontal circle intersects rectangle
+  const hw = box.w*0.5, hd = box.d*0.5;
+  const bx0 = box.x - hw, bx1 = box.x + hw;
+  const bz0 = box.z - hd, bz1 = box.z + hd;
+  // closest point on AABB
+  const px = clamp(cx, bx0, bx1);
+  const pz = clamp(cz, bz0, bz1);
+  const dx = cx - px, dz = cz - pz;
+  return (dx*dx + dz*dz) <= r*r;
+}
+
+/* Sweep movement with simple rejection/slide: attempt move and if collision, slide along obstacle */
+function moveWithCollisions(entity, desiredX, desiredZ){
+  const startX = entity.pos.x, startZ = entity.pos.z;
+  let nx = desiredX, nz = desiredZ;
+  // naive collision: if destination is inside obstacle, try sliding on each axis
+  for(const o of MAP.obstacles){
+    if(circleAABBOverlap(nx, nz, entity.radius, o)){
+      // try x-only
+      if(!circleAABBOverlap(nx, startZ, entity.radius, o)){
+        nz = startZ;
+      } else if(!circleAABBOverlap(startX, nz, entity.radius, o)){
+        nx = startX;
+      } else {
+        // block both: stay
+        nx = startX; nz = startZ;
+      }
+    }
+  }
+  entity.pos.x = nx; entity.pos.z = nz;
+}
+
+/* -------------------- Raycast utilities (ray in XZ plane for hitscan against bots and AABB) -------------------- */
+/* We'll raycast in 3D from camera pos (eye) along direction; test dynamic bot spheres and AABB triangles (approximated as boxes) */
+function raycast(origin, dir, maxDist){
+  // return hit {t, hitType:'bot'|'wall', target, point}
+  let nearest = { t: Infinity, info: null };
+  // bots as spheres, radius in 3D using bot radius and y at eye height approximated to 1.0 m
+  for(const b of bots){
+    if(!b.alive) continue;
+    // sphere center at (b.pos.x, 1.0, b.pos.z)
+    const center = new Vec3(b.pos.x,1.0,b.pos.z);
+    const oc = Vec3.sub(origin, center);
+    const a = Vec3.dot(dir, dir);
+    const bco = 2 * Vec3.dot(oc, dir);
+    const c = Vec3.dot(oc, oc) - 0.6*0.6; // sphere radius ~0.6m
+    const disc = bco*bco - 4*a*c;
+    if(disc < 0) continue;
+    const sqrtD = Math.sqrt(disc);
+    const t1 = (-bco - sqrtD) / (2*a);
+    const t2 = (-bco + sqrtD) / (2*a);
+    let t = t1>0 ? t1 : (t2>0 ? t2 : Infinity);
+    if(t > 0 && t < nearest.t && t <= maxDist){
+      nearest.t = t;
+      nearest.info = {hitType:'bot', target:b};
+    }
+  }
+  // AABB walls: approximate by testing slab intersection in full 3D, but our boxes have height h above ground; we'll treat them as centered vertically
+  for(const o of MAP.obstacles){
+    // box min/max in 3D
+    const hw = o.w*0.5, hd = o.d*0.5, hh = o.h;
+    const min = {x: o.x - hw, y: 0, z: o.z - hd};
+    const max = {x: o.x + hw, y: hh, z: o.z + hd};
+    const t = rayIntersectAABB(origin, dir, min, max);
+    if(t && t > 0 && t < nearest.t && t <= maxDist){
+      nearest.t = t;
+      nearest.info = {hitType:'wall', target:o};
+    }
+  }
+  if(nearest.info){
+    const p = new Vec3(origin.x + dir.x * nearest.t, origin.y + dir.y * nearest.t, origin.z + dir.z * nearest.t);
+    return { t: nearest.t, info: nearest.info, point: p };
+  }
+  return null;
+}
+
+/* Ray-AABB intersection (slab method) */
+function rayIntersectAABB(orig, dir, min, max){
+  let tmin = (min.x - orig.x) / dir.x, tmax = (max.x - orig.x) / dir.x;
+  if(tmin > tmax) { let tmp=tmin;tmin=tmax;tmax=tmp; }
+  let tymin = (min.y - orig.y) / dir.y, tymax = (max.y - orig.y) / dir.y;
+  if(tymin > tymax) { let tmp=tymin;tymin=tymax;tymax=tmp; }
+  if((tmin > tymax) || (tymin > tmax)) return null;
+  if(tymin > tmin) tmin = tymin;
+  if(tymax < tmax) tmax = tymax;
+  let tzmin = (min.z - orig.z) / dir.z, tzmax = (max.z - orig.z) / dir.z;
+  if(tzmin > tzmax) { let tmp=tzmin;tzmin=tzmax;tzmax=tmp;}
+  if((tmin > tzmax) || (tzmin > tmax)) return null;
+  if(tzmin > tmin) tmin = tzmin;
+  if(tzmax < tmax) tmax = tzmax;
+  if(tmin < 0 && tmax < 0) return null;
+  return tmin > 0 ? tmin : tmax;
+}
+
+/* -------------------- Simple WebAudio SFX -------------------- */
+const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = AudioCtx.createGain(); masterGain.gain.value = 0.8; masterGain.connect(AudioCtx.destination);
+function sfxShot(){ const o=AudioCtx.createOscillator(); const g=AudioCtx.createGain(); o.type='square'; o.frequency.value=1100; g.gain.value=0.0001; o.connect(g); g.connect(masterGain); const now=AudioCtx.currentTime; g.gain.exponentialRampToValueAtTime(0.12, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.18); o.start(now); o.stop(now+0.19); }
+function sfxHit(){ const o=AudioCtx.createOscillator(); const g=AudioCtx.createGain(); o.type='sawtooth'; o.frequency.value=220; g.gain.value=0.0001; o.connect(g); g.connect(masterGain); const now=AudioCtx.currentTime; g.gain.exponentialRampToValueAtTime(0.18, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.15); o.start(now); o.stop(now+0.16); }
+function sfxReload(){ const o=AudioCtx.createOscillator(); const g=AudioCtx.createGain(); o.frequency.value=420; o.type='sine'; g.gain.value=0.0001; o.connect(g); g.connect(masterGain); const now=AudioCtx.currentTime; g.gain.exponentialRampToValueAtTime(0.08, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.4); o.start(now); o.stop(now+0.42); }
+
+/* Resume audio on first interaction due to browser policy */
+window.addEventListener('pointerdown', ()=>{ if(AudioCtx.state === 'suspended') AudioCtx.resume(); }, { once:true });
+
+/* -------------------- Input handling (pointer lock + keys + mouse) -------------------- */
+let keys = {};
+window.addEventListener('keydown', (e)=>{ keys[e.code]=true; if(e.code==='KeyR') tryReload(); });
+window.addEventListener('keyup', (e)=>{ keys[e.code]=false; });
+
+let pointerLocked = false;
+canvas.addEventListener('click', ()=>{ canvas.requestPointerLock && canvas.requestPointerLock(); });
+document.addEventListener('pointerlockchange', ()=>{ pointerLocked = document.pointerLockElement === canvas; document.querySelector('.centerHud').style.display = pointerLocked ? 'none' : 'block'; });
+
+let mouseDX = 0, mouseDY = 0;
+canvas.addEventListener('mousemove', (e)=>{ if(!pointerLocked) return; mouseDX += e.movementX; mouseDY += e.movementY; });
+
+/* -------------------- Weapon fire logic (hitscan pistol) -------------------- */
+function fireWeapon(){
+  const w = Player.weapon;
+  const now = performance.now();
+  if(w.isReloading) return;
+  if(w.mag <= 0){ // click
+    // empty click sound could be added
+    return;
+  }
+  const cooldown = 60000 / w.rpm; // ms per shot
+  if(now - w.lastShot < cooldown) return;
+  w.lastShot = now;
+  w.mag--;
+  document.getElementById('ammo').textContent = w.mag;
+  sfxShot();
+
+  // compute firing direction with spread & recoil
+  // base camera forward dir
+  let dir = cameraForward();
+  // apply spread cone in degrees
+  const spread = w.spreadDeg || 1.2;
+  const r = degToRad(spread) * (Math.random()*0.5 + 0.5);
+  const ang = Math.random() * Math.PI * 2;
+  const sx = Math.cos(ang) * r, sy = Math.sin(ang) * r;
+  // apply small offset via yaw/pitch rotation
+  dir = rotateDirByAngles(dir, sy, sx); // small yaw (horizontal) and pitch (vertical) offsets
+
+  // recoil: bump camera
+  Player.recoilState.pitch += (w.recoil.pitch * (0.8 + Math.random()*0.4));
+  Player.recoilState.yaw += (Math.random()*2-1) * w.recoil.yaw;
+
+  // perform a raycast up to range (e.g., 80m)
+  const origin = cameraWorldPos();
+  const hit = raycast(origin, dir, 80);
+  if(hit){
+    if(hit.info.hitType === 'bot'){
+      // hit bot
+      const b = hit.info.target;
+      b.health -= 40; // pistol base damage
+      sfxHit();
+      if(b.health <= 0 && b.alive){
+        b.alive = false;
+        Player.kills++;
+        document.getElementById('kills').textContent = Player.kills;
+        // store highscore
+        const best = parseInt(localStorage.getItem('mini_fps_best') || '0', 10);
+        if(Player.kills > best) localStorage.setItem('mini_fps_best', String(Player.kills));
+      }
+    } else {
+      // hit wall -> spawn impact effect (visual feedback)
+      // small debug flash handled in render
+    }
+  }
+}
+
+/* Rotate direction vector by small pitch/yaw deltas (in radians) */
+function rotateDirByAngles(dir, dYaw, dPitch){
+  // yaw rotates around Y; pitch rotates around camera right axis
+  // apply yaw:
+  const cosy = Math.cos(dYaw), siny=Math.sin(dYaw);
+  let x = dir.x*cosy - dir.z*siny;
+  let z = dir.x*siny + dir.z*cosy;
+  let y = dir.y;
+  // right axis is cross(up, dir)
+  // apply pitch by rotating in vertical plane: rotate towards up/down:
+  const cosP = Math.cos(dPitch), sinP = Math.sin(dPitch);
+  // compute forward vector in local forward-up plane and rotate
+  // Simplify: pitch by adjusting y and scaling x,z
+  y = y * cosP + Math.sqrt(x*x + z*z) * sinP * -1; // approximate
+  const len = Math.hypot(x,z,y) || 1;
+  return new Vec3(x/len,y/len,z/len);
+}
+
+/* Attempts reload: sets timeout for reloadTime */
+function tryReload(){
+  const w = Player.weapon;
+  if(w.isReloading) return;
+  if(w.mag >= w.magMax) return;
+  if(w.reserve <= 0) return;
+  w.isReloading = true;
+  sfxReload();
+  setTimeout(()=> {
+    const need = w.magMax - w.mag;
+    const taken = Math.min(need, w.reserve);
+    w.mag += taken;
+    w.reserve -= taken;
+    w.isReloading = false;
+    document.getElementById('ammo').textContent = w.mag;
+    document.getElementById('reserve').textContent = w.reserve;
+  }, w.reloadTime * 1000);
+}
+
+/* -------------------- Camera helpers -------------------- */
+function cameraForward(){
+  // compute forward vector from yaw/pitch
+  const cy = Math.cos(Player.yaw), sy = Math.sin(Player.yaw);
+  const cp = Math.cos(Player.pitch), sp = Math.sin(Player.pitch);
+  return new Vec3(cp*cy, sp, cp*sy).normalize();
+}
+function cameraWorldPos(){ return new Vec3(Player.pos.x, Player.eyeHeight + Player.pos.y, Player.pos.z); }
+
+/* -------------------- Simple AI: vision, shooting, patrol -------------------- */
+function botUpdate(bot, dt){
+  if(!bot.alive){
+    // respawn after a delay
+    if(!bot._respawnTimer) bot._respawnTimer = 3 + Math.random()*4;
+    bot._respawnTimer -= dt;
+    if(bot._respawnTimer <= 0){
+      const sp = MAP.spawnPoints[Math.floor(Math.random() * MAP.spawnPoints.length)];
+      bot.respawn(sp);
+      bot._respawnTimer = null;
+    }
+    return;
+  }
+  // perception: check if player in FOV & LOS
+  // compute vector from bot to player eye
+  const toPlayer = Vec3.sub(new Vec3(Player.pos.x, 1.0, Player.pos.z), new Vec3(bot.pos.x, 1.0, bot.pos.z));
+  const dist = Math.hypot(toPlayer.x, toPlayer.z, toPlayer.y);
+  const dirToPlayer = toPlayer.copy().normalize();
+  // approximate bot facing vector towards waypoint or player
+  let facing = new Vec3(1,0,0);
+  if(bot._aimAtPlayer) facing = dirToPlayer;
+  else {
+    const wp = bot.waypoints[bot.wpIndex];
+    const towp = Vec3.sub(new Vec3(wp.x,0,wp.z), new Vec3(bot.pos.x,0,bot.pos.z));
+    if(towp.length() < 0.8) { bot.wpIndex = (bot.wpIndex+1) % bot.waypoints.length; }
+    else facing = towp.normalize();
+  }
+
+  // check LOS (raycast) and cone
+  const dot = dirToPlayer.x * facing.x + dirToPlayer.z * facing.z;
+  const inFOV = dot > Math.cos(degToRad(55)); // ~110deg FOV
+  let sees = false;
+  if(inFOV){
+    const origin = new Vec3(bot.pos.x, 1.0, bot.pos.z);
+    // simple raycast to player eye, limit to 60m
+    const hit = raycast(origin, dirToPlayer, 60);
+    if(hit && hit.info && hit.info.hitType === 'bot' && hit.info.target === undefined){
+      // improbable
+    }
+    // if raycast returns player (we treat player as dynamic sphere? Our raycast doesn't test player; do manual test)
+    // manual block test to player: test if any wall intersects segment
+    let blocked = false;
+    for(const o of MAP.obstacles){
+      const min = {x: o.x - o.w*0.5, y:0, z:o.z - o.d*0.5};
+      const max = {x: o.x + o.w*0.5, y:o.h, z:o.z + o.d*0.5};
+      const t = rayIntersectAABB(origin, dirToPlayer, min, max);
+      if(t && t > 0 && t < dist) { blocked = true; break; }
+    }
+    if(!blocked) sees = true;
+  }
+
+  if(sees){
+    bot._aimAtPlayer = true;
+    // reaction time before shooting
+    bot.reactTimer -= dt;
+    if(bot.reactTimer <= 0){
+      // shoot at player: simple hitscan with some inaccuracy based on distance
+      const origin = new Vec3(bot.pos.x,1.0,bot.pos.z);
+      const baseDir = dirToPlayer;
+      const spread = 1.8 * (1 + dist/40); // more spread at distance
+      const rx = (Math.random()*2-1) * degToRad(spread);
+      const ry = (Math.random()*2-1) * degToRad(spread);
+      const dir = rotateDirByAngles(baseDir, rx, ry);
+      const hit = raycast(origin, dir, 60);
+      if(hit && hit.info && hit.info.hitType === 'bot') {
+        // hits another bot — ignore
+      } else {
+        // check whether hit player
+        // distance to player along ray param t
+        // compute t to player's eye sphere
+        const center = cameraWorldPos();
+        const oc = Vec3.sub(origin, center);
+        const a = Vec3.dot(dir, dir);
+        const bco = 2 * Vec3.dot(oc, dir);
+        const c = Vec3.dot(oc, oc) - 0.6*0.6;
+        const disc = bco*bco - 4*a*c;
+        if(disc >= 0){
+          const sqrtD = Math.sqrt(disc);
+          const t1 = (-bco - sqrtD) / (2*a);
+          const t2 = (-bco + sqrtD) / (2*a);
+          const t = t1>0 ? t1 : (t2>0 ? t2 : Infinity);
+          if(t > 0 && t < 60){
+            // bot hits player
+            Player.health -= 16; if(Player.health < 0) Player.health = 0;
+            // camera hit feedback
+            Player.recoilState.pitch += 0.08;
+            sfxHit();
+            if(Player.health <= 0) {
+              // reset player
+              setTimeout(()=> respawnPlayer(), 400);
+            }
+          }
+        }
+      }
+      bot.reactTimer = 0.4 + Math.random()*0.6; // cooldown between bot shots
+    }
+  } else {
+    bot._aimAtPlayer = false;
+    bot.reactTimer = clamp(bot.reactTimer, 0.05, 1.0);
+    // Patrol movement toward waypoint
+    const wp = bot.waypoints[bot.wpIndex];
+    const dir = new Vec3(wp.x - bot.pos.x, 0, wp.z - bot.pos.z);
+    const dlen = Math.hypot(dir.x, dir.z);
+    if(dlen > 0.2){
+      dir.x /= dlen; dir.z /= dlen;
+      const desiredX = bot.pos.x + dir.x * bot.speed * dt;
+      const desiredZ = bot.pos.z + dir.z * bot.speed * dt;
+      moveWithCollisions(bot, desiredX, desiredZ);
+    } else {
+      bot.wpIndex = (bot.wpIndex+1) % bot.waypoints.length;
+    }
+  }
+}
+
+/* -------------------- Player respawn logic -------------------- */
+function respawnPlayer(){
+  Player.pos.set(0,0,-8); Player.yVel=0; Player.onGround=true; Player.health=Player.maxHealth;
+  document.getElementById('hp').textContent = Player.health;
+}
+
+/* -------------------- Fixed-step game loop -------------------- */
+const PHYS_DT = 1/120;
+let accumulator = 0;
+let lastTime = nowMs();
+let debugShown = true;
+document.getElementById('debug').style.display = debugShown ? 'block' : 'none';
+document.getElementById('toggleDebugBtn').addEventListener('click', ()=>{ debugShown = !debugShown; document.getElementById('debug').style.display = debugShown ? 'block' : 'none'; });
+
+function updatePhysics(dt){
+  // movement input
+  let inputX = 0, inputZ = 0;
+  if(keys['KeyW']||keys['ArrowUp']) inputZ += 1;
+  if(keys['KeyS']||keys['ArrowDown']) inputZ -= 1;
+  if(keys['KeyA']||keys['ArrowLeft']) inputX -= 1;
+  if(keys['KeyD']||keys['ArrowRight']) inputX += 1;
+  const moveLen = Math.hypot(inputX, inputZ);
+  if(moveLen > 0){
+    inputX /= moveLen; inputZ /= moveLen;
+  }
+
+  // compute desired speed
+  const sprinting = keys['ShiftLeft'] || keys['ShiftRight'];
+  const targetSpeed = sprinting ? Player.sprintSpeed : Player.speed;
+
+  // forward vector using yaw
+  const forward = new Vec3(Math.cos(Player.yaw), 0, Math.sin(Player.yaw));
+  const right = new Vec3(-forward.z, 0, forward.x);
+  const desiredVel = new Vec3(0,0,0);
+  desiredVel.x = forward.x * inputZ * targetSpeed + right.x * inputX * targetSpeed;
+  desiredVel.z = forward.z * inputZ * targetSpeed + right.z * inputX * targetSpeed;
+
+  // accelerate toward desiredVel
+  const dvx = desiredVel.x - Player.vel.x, dvz = desiredVel.z - Player.vel.z;
+  const accel = Player.accel;
+  Player.vel.x += clamp(dvx, -accel*dt, accel*dt);
+  Player.vel.z += clamp(dvz, -accel*dt, accel*dt);
+
+  // jumping
+  if((keys['Space'] || keys['KeyX']) && Player.onGround){
+    Player.yVel = Player.jumpImpulse;
+    Player.onGround = false;
+  }
+  // gravity
+  Player.yVel -= 9.81 * dt;
+  Player.pos.y += Player.yVel * dt;
+  if(Player.pos.y < 0){ Player.pos.y = 0; Player.onGround = true; Player.yVel = 0; }
+
+  // desired horizontal move
+  const nx = Player.pos.x + Player.vel.x * dt;
+  const nz = Player.pos.z + Player.vel.z * dt;
+  moveWithCollisions(Player, nx, nz);
+
+  // recoil recovery
+  Player.recoilState.pitch = approach(Player.recoilState.pitch, 0, 5*dt);
+  Player.recoilState.yaw = approach(Player.recoilState.yaw, 0, 6*dt);
+
+  // update weapon cooldown / auto-fire input
+  const w = Player.weapon;
+  if(keys['Mouse0'] || keys['Button1']){} // placeholder
+
+  // bots update
+  for(const b of bots) botUpdate(b, dt);
+
+  // simple auto-fire on left mouse button when pointer locked
+  if(pointerLocked && mouseDown) {
+    fireWeapon();
+  }
+
+  // simple reload via R handled earlier
+}
+
+function approach(value, target, delta){ if(value < target) return Math.min(value+delta,target); return Math.max(value-delta,target); }
+
+/* -------------------- Render loop -------------------- */
+function renderScene(alpha){
+  // construct camera matrices
+  const eyePos = cameraWorldPos();
+  // apply recoil state offsets to camera
+  const pitch = Player.pitch + Player.recoilState.pitch;
+  const yaw = Player.yaw + Player.recoilState.yaw;
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const cw = Math.cos(yaw), sw = Math.sin(yaw);
+  const forward = new Vec3(cp*cw, sp, cp*sw);
+  const center = new Vec3(eyePos.x + forward.x, eyePos.y + forward.y, eyePos.z + forward.z);
+  const up = new Vec3(0,1,0);
+  const view = Mat4.lookAt(eyePos, center, up);
+  const aspect = canvas.width / canvas.height;
+  const proj = Mat4.perspective(degToRad(75), aspect, 0.1, 200.0);
+
+  gl.viewport(0,0,canvas.width, canvas.height);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  gl.useProgram(program);
+  gl.bindVertexArray(vao);
+  gl.uniformMatrix4fv(uniView, false, view);
+  gl.uniformMatrix4fv(uniProj, false, proj);
+  gl.uniform3fv(uniLight, new Float32Array([0.7,0.9,0.6]));
+
+  // draw floor as big thin cube
+  drawBox(0, -0.02, 0, 40, 0.04, 60, [0.12,0.45,0.20], null);
+
+  // draw obstacles
+  for(const o of MAP.obstacles){
+    drawBox(o.x, o.h*0.5, o.z, o.w, o.h, o.d, o.color, null);
+  }
+
+  // draw bots as small cubes or spheres
+  for(const b of bots){
+    if(!b.alive) continue;
+    drawBox(b.pos.x, 0.9, b.pos.z, 0.7, 1.8, 0.7, b.color, null);
+  }
+
+  // optionally draw debug: spawn points
+  // viewmodel / weapon not rendered in GL — draw simple crosshair in CSS overlay
+
+  gl.bindVertexArray(null);
+}
+
+/* Draw a box centered at (x,y,z) with width w,height h, depth d and color */
+function drawBox(x,y,z,w,h,d,color,modelMat){
+  // model transform column-major
+  const m = Mat4.identity();
+  // scale
+  const sx = w, sy = h, sz = d;
+  // create model matrix manually (scale + translate)
+  // row-major set then transpose to column-major expected by shader? Our Mat4 functions expect column-major.
+  // We'll build column-major: scale then translate
+  m[0] = sx; m[5] = sy; m[10] = sz;
+  m[12] = x; m[13] = y; m[14] = z;
+  gl.uniformMatrix4fv(uniModel, false, m);
+  gl.uniform3fv(uniColor, new Float32Array(color));
+  gl.drawElements(gl.TRIANGLES, cubeIdx.length, gl.UNSIGNED_SHORT, 0);
+}
+
+/* -------------------- Mouse button handling -------------------- */
+let mouseDown = false;
+canvas.addEventListener('mousedown', (e)=>{ if(e.button===0) mouseDown=true; });
+canvas.addEventListener('mouseup', (e)=>{ if(e.button===0) mouseDown=false; });
+
+/* -------------------- Main loop (fixed-step physics & render) -------------------- */
+function tick(){
+  const tNow = nowMs();
+  let delta = (tNow - lastTime)/1000;
+  if(delta > 0.25) delta = 0.25;
+  lastTime = tNow;
+  accumulator += delta;
+  while(accumulator >= PHYS_DT){
+    // update camera rotation from mouse deltas
+    if(pointerLocked){
+      const sens = 0.0022;
+      Player.yaw -= mouseDX * sens;
+      Player.pitch -= mouseDY * sens;
+      Player.pitch = clamp(Player.pitch, -Math.PI/2 + 0.01, Math.PI/2 - 0.01);
+      mouseDX = 0; mouseDY = 0;
+    }
+    updatePhysics(PHYS_DT);
+    accumulator -= PHYS_DT;
+  }
+  const alpha = accumulator / PHYS_DT;
+  renderScene(alpha);
+
+  // update HUD elements
+  document.getElementById('hp').textContent = Math.max(0, Math.floor(Player.health));
+  document.getElementById('ammo').textContent = Player.weapon.mag;
+  document.getElementById('reserve').textContent = Player.weapon.reserve;
+  document.getElementById('wname').textContent = 'Pistol';
+  document.getElementById('leftPanel').textContent = `Health: ${Math.floor(Player.health)}`;
+  document.getElementById('rightPanel').textContent = `Ammo: ${Player.weapon.mag} / ${Player.weapon.reserve}`;
+  if(debugShown){
+    const dbg = document.getElementById('debug');
+    dbg.textContent = `pos: ${Player.pos.x.toFixed(2)},${Player.pos.z.toFixed(2)}  vel: ${Player.vel.x.toFixed(2)},${Player.vel.z.toFixed(2)}\nYaw:${Player.yaw.toFixed(2)} Pitch:${Player.pitch.toFixed(2)}\nBots:${bots.length}\nKills:${Player.kills}  Best:${localStorage.getItem('mini_fps_best')||0}`;
+  }
+  requestAnimationFrame(tick);
+}
+
+/* -------------------- Simple UI buttons -------------------- */
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  // hide menu, request pointer lock
+  canvas.requestPointerLock && canvas.requestPointerLock();
+  Player.kills = 0;
+  document.getElementById('kills').textContent = 0;
+  // reset bots
+  bots = []; for(let i=0;i<3;i++) addBot();
+});
+
+document.getElementById('addBotBtn').addEventListener('click', ()=>{ addBot(); });
+
+/* -------------------- Utility: resize canvas to fit window -------------------- */
+function resize(){
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.floor(window.innerWidth * dpr);
+  const h = Math.floor(window.innerHeight * dpr);
+  canvas.width = w; canvas.height = h;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* -------------------- Helper: shooting via keyboard / mouse input mappings -------------------- */
+window.addEventListener('mousedown', (e)=>{ if(e.button===0 && pointerLocked) mouseDown = true; });
+window.addEventListener('mouseup', (e)=>{ if(e.button===0) mouseDown = false; });
+window.addEventListener('keydown', (e)=>{ if(e.code === 'Escape') document.exitPointerLock && document.exitPointerLock(); });
+
+/* -------------------- Init and start loop -------------------- */
+lastTime = nowMs();
+requestAnimationFrame(tick);
+
+/* -------------------- End of prototype -------------------- */
+/* This file implements a compact MVP:
+   - first-person controller, pointer-lock look,
+   - simple collision on XZ plane against boxes,
+   - hitscan pistol, ammo and reload,
+   - basic bots with LOS perception & patrol,
+   - WebGL rendering of boxes and bots,
+   - WebAudio procedural SFX,
+   - HUD and localStorage highscore.
+   Expand by adding projectile weapons, navmesh/A*, ragdolls, more weapons, UI menus, sound assets, and improved rendering per the blueprint.
+*/
+</script>
+</body>
+</html>
