@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Mini-Maze 2D</title>
+<title>Mini-Maze 2D Arcade Animated</title>
 <style>
-body { margin:0; background:#222; font-family:sans-serif; }
-canvas { display:block; margin:0 auto; background:#333; }
+body { margin:0; background:#222; font-family:sans-serif; overflow:hidden; }
+canvas { display:block; margin:0 auto; background:#333; transition: transform 0.05s ease; }
 #ui {
   position:absolute; top:10px; left:10px; color:white;
   background: rgba(255,255,255,0.85); padding:10px; border-radius:6px;
@@ -17,7 +17,7 @@ canvas { display:block; margin:0 auto; background:#333; }
 <div id="ui">
 <p id="status">Level: 1 | Score: 0 | Time: 30 | Highscore: 0</p>
 </div>
-<canvas id="gameCanvas" width="400" height="400"></canvas>
+<canvas id="gameCanvas" width="500" height="500"></canvas>
 
 <!-- Sounds -->
 <audio id="starSound" src="https://freesound.org/data/previews/320/320655_5260876-lq.mp3"></audio>
@@ -27,18 +27,24 @@ canvas { display:block; margin:0 auto; background:#333; }
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const tileSize = 40;
+let tileSize = 40;
 
 let gridSize = 5, level=1, score=0, timer=30;
 let highscore = localStorage.getItem('miniMazeHighscore')||0;
-let mazeMap=[], player={x:0,y:0}, exit={x:4,y:4};
+
+let mazeMap=[], player={x:0,y:0,px:0,py:0}, exit={x:4,y:4};
 let stars=[], traps=[];
+let particles=[];
+let touchStart=null;
 
 generateMaze();
 draw();
+updateStatus();
+startTimer();
 
 window.addEventListener('keydown', handleKey);
-startTimer();
+window.addEventListener('touchstart', e=>{ touchStart = e.touches[0]; });
+window.addEventListener('touchend', handleSwipe);
 
 function playSound(id){ const audio=document.getElementById(id); if(audio){ audio.currentTime=0; audio.play(); } }
 
@@ -55,11 +61,73 @@ function generateMaze(){
             else if(r<0.35){ mazeMap[y][x]=3; traps.push({x,y}); }
         }
     }
-    player={x:0,y:0};
+    player={x:0,y:0,px:0,py:0};
+}
+
+function handleKey(e){
+    let dx=0,dy=0;
+    if(e.key==='ArrowUp'||e.key==='w') dy=-1;
+    else if(e.key==='ArrowDown'||e.key==='s') dy=1;
+    else if(e.key==='ArrowLeft'||e.key==='a') dx=-1;
+    else if(e.key==='ArrowRight'||e.key==='d') dx=1;
+    movePlayer(dx,dy);
+}
+
+function handleSwipe(e){
+    if(!touchStart) return;
+    const touchEnd = e.changedTouches[0];
+    const dx = touchEnd.clientX - touchStart.clientX;
+    const dy = touchEnd.clientY - touchStart.clientY;
+    if(Math.abs(dx)>Math.abs(dy)) dx>0?movePlayer(1,0):movePlayer(-1,0);
+    else dy>0?movePlayer(0,1):movePlayer(0,-1);
+    touchStart=null;
+}
+
+function canMove(x,y){ return x>=0 && y>=0 && x<gridSize && y<gridSize && mazeMap[y][x]!==1; }
+
+function movePlayer(dx,dy){
+    const nx = player.x+dx, ny = player.y+dy;
+    if(!canMove(nx,ny)) return;
+    player.x=nx; player.y=ny;
+
+    // smooth movement target
+    const targetX = nx*tileSize+5, targetY = ny*tileSize+5;
+    gsap.to(player, {px: targetX, py: targetY, duration:0.15, ease:"power1.out"});
+
+    // collect star
+    for(let i=stars.length-1;i>=0;i--){
+        if(stars[i].x===nx && stars[i].y===ny){
+            playSound('starSound');
+            spawnParticles(nx,ny,"yellow");
+            stars.splice(i,1);
+            score+=10;
+        }
+    }
+
+    // trap
+    traps.forEach(t=>{
+        if(t.x===nx && t.y===ny){
+            timer = Math.max(1,timer-5);
+            playSound('trapSound');
+            shakeCanvas();
+            spawnParticles(nx,ny,"blue");
+        }
+    });
+
+    // exit
+    if(nx===exit.x && ny===exit.y){
+        playSound('levelUpSound');
+        spawnParticles(nx,ny,"green");
+        level++; gridSize=Math.min(gridSize+1,10); timer=30;
+        generateMaze();
+    }
+
+    updateStatus();
 }
 
 function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    // maze walls
     for(let y=0;y<gridSize;y++){
         for(let x=0;x<gridSize;x++){
             if(mazeMap[y][x]===1){ ctx.fillStyle="#555"; ctx.fillRect(x*tileSize,y*tileSize,tileSize,tileSize); }
@@ -72,37 +140,35 @@ function draw(){
     // exit
     ctx.fillStyle="green"; ctx.fillRect(exit.x*tileSize+5,exit.y*tileSize+5,30,30);
     // player
-    ctx.fillStyle="red"; ctx.fillRect(player.x*tileSize+5,player.y*tileSize+5,30,30);
+    ctx.fillStyle="red"; ctx.fillRect(player.px, player.py, 30, 30);
+
+    // particles
+    for(let i=particles.length-1;i>=0;i--){
+        const p = particles[i];
+        ctx.fillStyle=p.color;
+        ctx.globalAlpha = p.life/15;
+        ctx.fillRect(p.x*tileSize+20 + p.vx, p.y*tileSize+20 + p.vy, p.size, p.size);
+        p.vx += (Math.random()-0.5)*0.5;
+        p.vy -= Math.random()*0.5;
+        p.life--;
+        if(p.life<=0) particles.splice(i,1);
+    }
+    ctx.globalAlpha =1;
+    requestAnimationFrame(draw);
 }
 
-function handleKey(e){
-    let dx=0,dy=0;
-    if(e.key==='ArrowUp'||e.key==='w') dy=-1;
-    else if(e.key==='ArrowDown'||e.key==='s') dy=1;
-    else if(e.key==='ArrowLeft'||e.key==='a') dx=-1;
-    else if(e.key==='ArrowRight'||e.key==='d') dx=1;
-    movePlayer(dx,dy);
+function spawnParticles(x,y,color){
+    for(let i=0;i<15;i++){
+        particles.push({x:x,y:y,size:2+Math.random()*3,color:color,life:10+Math.random()*10, vx:0, vy:0});
+    }
 }
 
-function canMove(x,y){ return x>=0 && y>=0 && x<gridSize && y<gridSize && mazeMap[y][x]!==1; }
-
-function movePlayer(dx,dy){
-    const nx=player.x+dx, ny=player.y+dy;
-    if(!canMove(nx,ny)) return;
-    player.x=nx; player.y=ny;
-    // collect star
-    for(let i=stars.length-1;i>=0;i--){
-        if(stars[i].x===nx && stars[i].y===ny){ stars.splice(i,1); score+=10; playSound('starSound'); }
-    }
-    // trap
-    traps.forEach(t=>{ if(t.x===nx && t.y===ny){ timer=Math.max(1,timer-5); playSound('trapSound'); } });
-    // exit
-    if(nx===exit.x && ny===exit.y){
-        playSound('levelUpSound'); level++; gridSize=Math.min(gridSize+1,10);
-        generateMaze();
-    }
-    updateStatus();
-    draw();
+function shakeCanvas(){
+    const intensity=5;
+    const dx=(Math.random()-0.5)*intensity;
+    const dy=(Math.random()-0.5)*intensity;
+    canvas.style.transform=`translate(${dx}px,${dy}px)`;
+    setTimeout(()=>{ canvas.style.transform="translate(0,0)"; },50);
 }
 
 function updateStatus(){
@@ -115,9 +181,9 @@ function startTimer(){
         timer--;
         if(timer<=0){ alert('Time up!'); score=0; timer=30; level=1; gridSize=5; generateMaze(); }
         updateStatus();
-        draw();
     },1000);
 }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 </body>
 </html>
