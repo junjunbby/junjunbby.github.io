@@ -1,257 +1,294 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Mini-Maze 2.5D Arcade Working</title>
+<title>Mini-Maze 2D Neon Arcade – Exit Pflicht</title>
 <style>
-body { margin:0; overflow:hidden; font-family:sans-serif; touch-action: none; background:#222; }
+body { margin:0; background:#111; font-family:sans-serif; overflow:hidden; }
+canvas { display:block; margin:0 auto; transition: transform 0.05s ease; }
 #ui {
-  position:absolute; top:10px; left:10px;
-  background: rgba(255,255,255,0.85); padding:10px; border-radius:8px;
-  z-index:10;
+  position:absolute; top:10px; left:10px; color:white;
+  background: rgba(0,0,0,0.5); padding:10px; border-radius:6px;
+  font-family:sans-serif; font-weight:bold; text-shadow:0 0 5px #0ff;
 }
-#ui h3 { margin:0 0 5px 0; color:#333; }
-#ui p { margin:2px 0; color:#222; }
 </style>
 </head>
 <body>
 <div id="ui">
-  <h3>Mini-Maze 2.5D Arcade</h3>
-  <p>Arrow keys / WASD / swipe: move</p>
-  <p id="status">Level: 1 | Score: 0 | Time: 30 | Highscore: 0</p>
+<p id="status">Level: 1 | Score: 0 | Combo: 0 | Time: 30 | Highscore: 0</p>
 </div>
+<canvas id="gameCanvas" width="500" height="500"></canvas>
 
-<!-- Audio -->
+<!-- Sounds -->
 <audio id="starSound" src="https://freesound.org/data/previews/320/320655_5260876-lq.mp3"></audio>
 <audio id="trapSound" src="https://freesound.org/data/previews/198/198841_2859976-lq.mp3"></audio>
 <audio id="levelUpSound" src="https://freesound.org/data/previews/146/146725_2615114-lq.mp3"></audio>
+<audio id="bgMusic" src="https://freesound.org/data/previews/569/569995_11149289-lq.mp3" loop></audio>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script>
-let scene, camera, renderer;
-let gridSize=5, cellSize=4, level=1, score=0, timer=30, highscore=localStorage.getItem('miniMazeHighscore')||0;
-let mazeMap=[], stars=[], traps=[], particlesGroup=[];
-let playerPos={x:0,y:0}, playerMesh, exitPos={x:0,y:0};
-let interval, touchStart=null;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let tileSize = 40;
 
-init(); animate(); startTimer();
+let gridSize = 5, level=1, score=0, timer=30, combo=0;
+let highscore = localStorage.getItem('miniMazeHighscore')||0;
+
+let mazeMap=[], player={x:0,y:0,px:0,py:0}, exit={x:4,y:4};
+let stars=[], traps=[], particles=[], playerTrails=[], comboPopups=[];
+let touchStart=null;
+let showLevelIntro = true;
+let levelIntroAlpha = 1;
+
+let comboTimer = null;
+const comboDuration = 2000;
+let pulseIntensity = 0;
+
+let bgStars=[];
+for(let i=0;i<50;i++){ bgStars.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, size:Math.random()*2+1, speed:Math.random()*0.3+0.1}); }
+
+generateMaze();
+draw();
+updateStatus();
+startTimer();
+
+const bgMusic = document.getElementById('bgMusic');
+bgMusic.volume = 0.3;
+bgMusic.play();
+
+window.addEventListener('keydown', handleKey);
+window.addEventListener('touchstart', e=>{ touchStart = e.touches[0]; });
+window.addEventListener('touchend', handleSwipe);
 
 function playSound(id){ const audio=document.getElementById(id); if(audio){ audio.currentTime=0; audio.play(); } }
 
-function init(){
-  scene = new THREE.Scene(); scene.background = new THREE.Color(0x222222);
-
-  camera = new THREE.PerspectiveCamera(50,window.innerWidth/window.innerHeight,0.1,1000);
-  camera.position.set(gridSize*cellSize/2, gridSize*cellSize*1.8, gridSize*cellSize/1.5);
-  camera.lookAt(gridSize*cellSize/2,0,gridSize*cellSize/2);
-
-  renderer = new THREE.WebGLRenderer({antialias:true});
-  renderer.setSize(window.innerWidth,window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
-
-  const dirLight = new THREE.DirectionalLight(0xffffff,1);
-  dirLight.position.set(10,50,10);
-  dirLight.castShadow=true;
-  scene.add(dirLight);
-  scene.add(new THREE.AmbientLight(0xffffff,0.5));
-
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(gridSize*cellSize, gridSize*cellSize),
-      new THREE.MeshStandardMaterial({color:0x333333, metalness:0.5, roughness:0.3}));
-  floor.rotation.x=-Math.PI/2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  generateMaze(); createPlayer(); updateStatus();
-
-  window.addEventListener('keydown',handleKey);
-  window.addEventListener('touchstart',e=>{ touchStart=e.touches[0]; });
-  window.addEventListener('touchend',handleSwipe);
-}
-
-// --- Maze Generation ---
 function generateMaze(){
-  mazeMap=Array(gridSize).fill(0).map(()=>Array(gridSize).fill(0));
-  stars=[]; traps=[];
-
-  // Remove previous walls/stars/traps
-  for(let i=scene.children.length-1;i>=0;i--){
-    const obj = scene.children[i];
-    if(obj.userData && obj.userData.type && ["wall","star","trap"].includes(obj.userData.type)){
-      scene.remove(obj);
+    mazeMap = Array(gridSize).fill(0).map(()=>Array(gridSize).fill(0));
+    stars=[]; traps=[];
+    for(let y=0;y<gridSize;y++){
+        for(let x=0;x<gridSize;x++){
+            if(x===0 && y===0){ mazeMap[y][x]=0; continue; }
+            if(x===gridSize-1 && y===gridSize-1){ mazeMap[y][x]=4; exit={x,y}; continue; }
+            const r=Math.random();
+            if(r<0.2){ mazeMap[y][x]=1; }
+            else if(r<0.3){ mazeMap[y][x]=2; stars.push({x,y}); }
+            else if(r<0.35){ mazeMap[y][x]=3; traps.push({x,y}); }
+        }
     }
-  }
-
-  for(let y=0;y<gridSize;y++){
-    for(let x=0;x<gridSize;x++){
-      if(x===0 && y===0){ mazeMap[y][x]=0; continue; }
-      if(x===gridSize-1 && y===gridSize-1){ mazeMap[y][x]=4; exitPos={x,y}; continue; }
-
-      const rand=Math.random();
-      if(rand<0.2){ mazeMap[y][x]=1; createWall(x,y); }
-      else if(rand<0.3){ mazeMap[y][x]=2; createStar(x,y); }
-      else if(rand<0.35){ mazeMap[y][x]=3; createTrap(x,y); }
-      else mazeMap[y][x]=0;
-    }
-  }
+    player={x:0,y:0,px:0,py:0};
+    showLevelIntroAnimation();
 }
 
-function createWall(x,y){
-  const cube = new THREE.Mesh(new THREE.BoxGeometry(cellSize,cellSize*0.7,cellSize),
-    new THREE.MeshStandardMaterial({color:0x555555}));
-  cube.position.set(x*cellSize+cellSize/2,cellSize*0.35,y*cellSize+cellSize/2);
-  cube.castShadow=true;
-  cube.userData.type="wall";
-  scene.add(cube);
-}
-
-function createStar(x,y){
-  const star = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/2,cellSize/2),
-    new THREE.MeshStandardMaterial({color:0xffff00}));
-  star.position.set(x*cellSize+cellSize/2,cellSize/4,y*cellSize+cellSize/2);
-  star.castShadow=true;
-  star.userData.type="star";
-  scene.add(star);
-  stars.push({x,y,mesh:star});
-}
-
-function createTrap(x,y){
-  const trap = new THREE.Mesh(new THREE.BoxGeometry(cellSize/2,cellSize/4,cellSize/2),
-    new THREE.MeshStandardMaterial({color:0x5555ff, emissive:0x0000ff, emissiveIntensity:0.3}));
-  trap.position.set(x*cellSize+cellSize/2,cellSize/8,y*cellSize+cellSize/2);
-  trap.castShadow=true;
-  trap.userData.type="trap";
-  scene.add(trap);
-  traps.push({x,y,mesh:trap});
-}
-
-// --- Player ---
-function createPlayer(){
-  if(playerMesh) scene.remove(playerMesh);
-  const geom = new THREE.BoxGeometry(cellSize*0.8,cellSize*0.8,cellSize*0.8);
-  const mat = new THREE.MeshStandardMaterial({color:0xff5555});
-  playerMesh = new THREE.Mesh(geom,mat);
-  playerMesh.position.set(playerPos.x*cellSize+cellSize/2,cellSize/2,playerPos.y*cellSize+cellSize/2);
-  playerMesh.castShadow=true;
-  scene.add(playerMesh);
-}
-
-// --- Controls ---
-function handleKey(e){ let dx=0,dy=0;
-  if(e.key==='ArrowUp'||e.key==='w'||e.key==='W') dy=-1;
-  else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S') dy=1;
-  else if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') dx=-1;
-  else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') dx=1;
-  movePlayer(dx,dy);
+function handleKey(e){
+    if(showLevelIntro) return; 
+    let dx=0,dy=0;
+    if(e.key==='ArrowUp'||e.key==='w') dy=-1;
+    else if(e.key==='ArrowDown'||e.key==='s') dy=1;
+    else if(e.key==='ArrowLeft'||e.key==='a') dx=-1;
+    else if(e.key==='ArrowRight'||e.key==='d') dx=1;
+    movePlayer(dx,dy);
 }
 
 function handleSwipe(e){
-  if(!touchStart) return;
-  const touchEnd = e.changedTouches[0];
-  const dx = touchEnd.clientX - touchStart.clientX;
-  const dy = touchEnd.clientY - touchStart.clientY;
-  if(Math.abs(dx)>Math.abs(dy)){ dx>0?movePlayer(1,0):movePlayer(-1,0); } 
-  else { dy>0?movePlayer(0,1):movePlayer(0,-1); }
-  touchStart=null;
+    if(showLevelIntro) return;
+    if(!touchStart) return;
+    const touchEnd = e.changedTouches[0];
+    const dx = touchEnd.clientX - touchStart.clientX;
+    const dy = touchEnd.clientY - touchStart.clientY;
+    if(Math.abs(dx)>Math.abs(dy)) dx>0?movePlayer(1,0):movePlayer(-1,0);
+    else dy>0?movePlayer(0,1):movePlayer(0,-1);
+    touchStart=null;
 }
 
-// --- Movement & Collisions ---
-function canMove(nx,ny){ return nx>=0 && ny>=0 && nx<gridSize && ny<gridSize && mazeMap[ny][nx]!==1; }
+function canMove(x,y){ return x>=0 && y>=0 && x<gridSize && y<gridSize && mazeMap[y][x]!==1; }
 
 function movePlayer(dx,dy){
-  const nx=playerPos.x+dx, ny=playerPos.y+dy;
-  if(!canMove(nx,ny)) return;
-  playerPos.x=nx; playerPos.y=ny;
+    const nx = player.x+dx, ny = player.y+dy;
+    if(!canMove(nx,ny)) return;
+    player.x=nx; player.y=ny;
+    const targetX = nx*tileSize+5, targetY = ny*tileSize+5;
+    gsap.to(player, {px: targetX, py: targetY, duration:0.15, ease:"power1.out"});
 
-  gsap.to(playerMesh.position,{duration:0.15, x:nx*cellSize+cellSize/2, z=ny*cellSize+cellSize/2});
-  gsap.to(scene.rotation,{duration:0.12, x:dy*0.04, z:-dx*0.04, yoyo:true, repeat:1});
+    addPlayerTrail();
+    collectStars();
+    checkTraps();
 
-  // Stars
-  for(let i=stars.length-1;i>=0;i--){
-    if(stars[i].x===nx && stars[i].y===ny){
-      spawnParticles(playerMesh.position.x,playerMesh.position.y,playerMesh.position.z,0xffff00);
-      shakeCamera(0.12,0.12);
-      scene.remove(stars[i].mesh); stars.splice(i,1);
-      score+=10; playSound('starSound'); updateStatus();
+    // Exit: Levelziel
+    if(nx===exit.x && ny===exit.y) levelUp();
+    updateStatus();
+}
+
+function levelUp(){
+    playSound('levelUpSound');
+    spawnParticles(exit.x, exit.y, "#0f0");
+    level++;
+    gridSize = Math.min(gridSize+1, 10);
+    timer = 30;
+    generateMaze();
+    combo = 0;
+    pulseIntensity = 0;
+    bgMusic.playbackRate = 1;
+}
+
+function addPlayerTrail(){
+    let trailColor = combo>=5 ? "#f0f" : combo>=3 ? "#ff6600" : "#ff0";
+    let trailSize = 3 + Math.min(combo,5);
+    playerTrails.push({x:player.px+15, y:player.py+15, life:15, color:trailColor, size:trailSize});
+}
+
+function collectStars(){
+    for(let i=stars.length-1;i>=0;i--){
+        if(stars[i].x===player.x && stars[i].y===player.y){
+            playSound('starSound');
+            spawnParticles(player.x,player.y,"#0ff");
+
+            combo++;
+            clearTimeout(comboTimer);
+            comboTimer = setTimeout(()=>{
+                combo=0; updateStatus(); pulseIntensity=0; bgMusic.playbackRate = 1;
+            }, comboDuration);
+
+            let trailColor = combo>=5 ? "#f0f" : combo>=3 ? "#ff6600" : "#ff0";
+            comboPopups.push({x: player.x*tileSize+20, y: player.y*tileSize+10, text: 'x'+combo, color: trailColor, life:50});
+
+            if(combo>=3) shakeCanvas(combo>=5 ? 8 : 4);
+            if(combo>=3) pulseIntensity = combo>=5 ? 0.3 : 0.15;
+
+            // Music speed
+            if(combo>=5) bgMusic.playbackRate = 1.5;
+            else if(combo>=3) bgMusic.playbackRate = 1.2;
+            else bgMusic.playbackRate = 1;
+
+            score += 10 * (1 + Math.floor(combo/3));
+            stars.splice(i,1);
+        }
     }
-  }
-
-  // Traps
-  for(let t of traps){ if(t.x===nx && t.y===ny){ shakeCamera(0.2,0.15); playSound('trapSound'); timer=Math.max(1,timer-5); updateStatus(); } }
-
-  // Exit
-  if(nx===exitPos.x && ny===exitPos.y){
-    spawnParticles(playerMesh.position.x,playerMesh.position.y,playerMesh.position.z,0x00ff00);
-    shakeCamera(0.25,0.2);
-    playSound('levelUpSound'); // NEW sound for next level
-    level++; gridSize=Math.min(gridSize+1,10); playerPos={x:0,y:0};
-    generateMaze(); createPlayer(); updateStatus();
-  }
 }
 
-// --- Particles & Camera Shake ---
-function spawnParticles(x,y,z,color=0xffff00){
-  const geom = new THREE.BufferGeometry();
-  const vertices=[]; for(let i=0;i<30;i++) vertices.push(x,y,z);
-  geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices,3));
-  const mat = new THREE.PointsMaterial({color,size:0.3});
-  const points = new THREE.Points(geom,mat); scene.add(points);
-  particlesGroup.push({points,life:30});
+function checkTraps(){
+    traps.forEach(t=>{
+        if(t.x===player.x && t.y===player.y){
+            timer = Math.max(1,timer-5);
+            playSound('trapSound');
+            shakeCanvas(6);
+            spawnParticles(player.x,player.y,"#f0f");
+            combo = 0;
+            pulseIntensity = 0;
+            bgMusic.playbackRate = 1;
+        }
+    });
 }
 
-function shakeCamera(intensity=0.2,duration=0.15){
-  const orig = camera.position.clone();
-  gsap.to(camera.position,{
-    duration:duration,
-    x: orig.x + (Math.random()-0.5)*intensity,
-    y: orig.y + (Math.random()-0.5)*intensity,
-    z: orig.z + (Math.random()-0.5)*intensity,
-    yoyo:true, repeat:1,
-    onComplete:()=>{ camera.position.copy(orig); }
-  });
+function drawBackground(){
+    let pulse = Math.sin(Date.now()/500)*2 + pulseIntensity*50;
+    ctx.strokeStyle="rgba(0,255,255,0.1)";
+    ctx.lineWidth=1;
+    for(let x=0;x<=canvas.width;x+=tileSize){
+        ctx.beginPath(); ctx.moveTo(x+pulse,0); ctx.lineTo(x+pulse,canvas.height); ctx.stroke();
+    }
+    for(let y=0;y<=canvas.height;y+=tileSize){
+        ctx.beginPath(); ctx.moveTo(0,y+pulse); ctx.lineTo(canvas.width,y+pulse); ctx.stroke();
+    }
+    ctx.fillStyle="#0ff";
+    bgStars.forEach(s=>{ ctx.fillRect(s.x,s.y,s.size,s.size); s.y += s.speed; if(s.y>canvas.height) s.y=0; });
 }
 
-// --- UI / Timer ---
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawBackground();
+
+    for(let y=0;y<gridSize;y++){
+        for(let x=0;x<gridSize;x++){
+            if(mazeMap[y][x]===1){
+                ctx.shadowColor="#0ff"; ctx.shadowBlur=12 + pulseIntensity*20;
+                ctx.fillStyle="#00f"; ctx.fillRect(x*tileSize,y*tileSize,tileSize,tileSize);
+            }
+        }
+    }
+    ctx.shadowBlur=0;
+
+    stars.forEach(s=>{
+        ctx.shadowColor="#0ff"; ctx.shadowBlur=15 + pulseIntensity*20;
+        ctx.fillStyle="#0ff"; ctx.fillRect(s.x*tileSize+10,s.y*tileSize+10,20,20);
+    });
+    ctx.shadowBlur=0;
+
+    traps.forEach(t=>{
+        ctx.shadowColor="#f0f"; ctx.shadowBlur=15 + pulseIntensity*20;
+        ctx.fillStyle="#f0f"; ctx.fillRect(t.x*tileSize+10,t.y*tileSize+10,20,20);
+    });
+    ctx.shadowBlur=0;
+
+    ctx.shadowColor="#0f0"; ctx.shadowBlur=20 + pulseIntensity*20;
+    ctx.fillRect(exit.x*tileSize+5,exit.y*tileSize+5,30,30);
+    ctx.shadowBlur=0;
+
+    playerTrails.forEach((t,i)=>{
+        ctx.fillStyle = t.color; ctx.globalAlpha = t.life/15;
+        ctx.shadowColor=t.color; ctx.shadowBlur=10 + pulseIntensity*20;
+        ctx.beginPath(); ctx.arc(t.x,t.y,t.size,0,Math.PI*2); ctx.fill();
+        t.life--; if(t.life<=0) playerTrails.splice(i,1);
+    });
+    ctx.globalAlpha=1; ctx.shadowBlur=0;
+
+    ctx.shadowColor="#ff0"; ctx.shadowBlur=15 + pulseIntensity*20;
+    ctx.fillStyle="#ff0"; ctx.fillRect(player.px, player.py,30,30);
+    ctx.shadowBlur=0;
+
+    particles.forEach((p,i)=>{
+        ctx.fillStyle=p.color; ctx.globalAlpha = p.life/15;
+        ctx.fillRect(p.x*tileSize+20 + p.vx, p.y*tileSize+20 + p.vy, p.size, p.size);
+        p.vx += (Math.random()-0.5)*0.5; p.vy -= Math.random()*0.5; p.life--;
+        if(p.life<=0) particles.splice(i,1);
+    });
+    ctx.globalAlpha=1;
+
+    comboPopups.forEach((c,i)=>{
+        ctx.globalAlpha = c.life/50; ctx.fillStyle = c.color;
+        ctx.font = "bold 20px Arial"; ctx.textAlign = "center";
+        ctx.shadowColor = c.color; ctx.shadowBlur = 10 + pulseIntensity*20;
+        ctx.fillText(c.text, c.x, c.y); c.y -= 0.5; c.life--;
+        if(c.life<=0) comboPopups.splice(i,1);
+    });
+    ctx.globalAlpha=1; ctx.shadowBlur=0;
+
+    if(showLevelIntro){
+        ctx.save(); ctx.globalAlpha = levelIntroAlpha;
+        ctx.fillStyle = "#0ff"; ctx.font = "bold 60px Arial"; ctx.textAlign = "center";
+        ctx.shadowColor="#0ff"; ctx.shadowBlur=20 + pulseIntensity*20;
+        ctx.fillText("LEVEL " + level, canvas.width/2, canvas.height/2); ctx.restore();
+    }
+
+    requestAnimationFrame(draw);
+}
+
+function shakeCanvas(intensity=5){
+    const dx=(Math.random()-0.5)*intensity; const dy=(Math.random()-0.5)*intensity;
+    canvas.style.transform=`translate(${dx}px,${dy}px)`;
+    setTimeout(()=>{ canvas.style.transform="translate(0,0)"; },50);
+}
+
+function spawnParticles(x,y,color){
+    for(let i=0;i<15;i++){ particles.push({x:x,y:y,size:2+Math.random()*3,color:color,life:10+Math.random()*10,vx:0,vy:0}); }
+}
+
 function updateStatus(){
-  document.getElementById('status').textContent=
-    `Level: ${level} | Score: ${score} | Time: ${timer} | Highscore: ${highscore}`;
-  if(score>highscore){ highscore=score; localStorage.setItem('miniMazeHighscore',highscore);}
+    if(score>highscore){ highscore=score; localStorage.setItem('miniMazeHighscore',highscore); }
+    document.getElementById('status').textContent = `Level: ${level} | Score: ${score} | Combo: ${combo} | Time: ${timer} | Highscore: ${highscore}`;
 }
 
 function startTimer(){
-  clearInterval(interval);
-  interval=setInterval(()=>{
-    timer--; if(timer<=0){
-      alert('Time up!');
-      if(score>highscore){ highscore=score; localStorage.setItem('miniMazeHighscore',highscore); alert('New Highscore: '+highscore);}
-      level=1; gridSize=5; score=0; timer=30; generateMaze(); createPlayer(); updateStatus();
-    }
-    updateStatus();
-  },1000);
+    setInterval(()=>{
+        timer--;
+        if(timer<=0){ alert('Time up!'); score=0; timer=30; level=1; gridSize=5; generateMaze(); combo=0; pulseIntensity=0; bgMusic.playbackRate=1; updateStatus(); }
+        updateStatus();
+    },1000);
 }
 
-// --- Animate ---
-function animate(){
-  requestAnimationFrame(animate);
-
-  for(let s of stars) s.mesh.rotation.y+=0.02;
-  for(let t of traps) t.mesh.material.emissiveIntensity=0.3+0.2*Math.sin(Date.now()*0.01);
-
-  gsap.to(camera.position,{duration:0.15, x:playerMesh.position.x + gridSize, z:playerMesh.position.z + gridSize});
-  camera.lookAt(playerMesh.position);
-
-  for(let i=particlesGroup.length-1;i>=0;i--){
-    const p=particlesGroup[i]; const pos=p.points.geometry.attributes.position.array;
-    for(let j=0;j<pos.length;j+=3){
-      pos[j]+=(Math.random()-0.5)*0.2; pos[j+1]+=(Math.random()*0.2); pos[j+2]+=(Math.random()-0.5)*0.2;
-    }
-    p.points.geometry.attributes.position.needsUpdate=true; p.life--;
-    if(p.life<=0){ scene.remove(p.points); particlesGroup.splice(i,1); }
-  }
-
-  renderer.render(scene,camera);
+function showLevelIntroAnimation(){
+    showLevelIntro = true;
+    levelIntroAlpha = 1;
+    gsap.to(window, {duration:1.2, levelIntroAlpha:0, onUpdate:()=>{}, onComplete:()=>{showLevelIntro=false;}});
 }
 </script>
 </body>
