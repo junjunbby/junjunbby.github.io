@@ -1,265 +1,232 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini-Arcade Dashboard</title>
+<title>Mini-Maze 2.5D Arcade</title>
 <style>
-:root {
-    --bg-color: #0d0d0d;
-    --bg-gradient: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 100%);
-    --primary-color: #4a4a4a;
-    --secondary-color: #666666;
-    --text-color: #e0e0e0;
-    --card-bg: rgba(30, 30, 30, 0.9);
-    --card-border: rgba(80, 80, 80, 0.3);
-    --card-hover-border: rgba(120, 120, 120, 0.6);
-    --shadow-color: rgba(0, 0, 0, 0.5);
-    --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    --font-title: 'Arial Black', sans-serif;
-    --grid-columns: auto-fit;
-    --grid-min-width: 280px;
-    --grid-gap: 2rem;
-    --card-padding: 1.5rem;
-    --thumbnail-width: 220px;
-    --thumbnail-height: 140px;
-    --thumbnail-border-radius: 12px;
-    --thumbnail-border: 2px solid rgba(100, 100, 100, 0.4);
-    --hover-scale: 1.05;
-    --hover-rotate: 2deg;
-    --hover-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-    --avatar-size: 120px;
-    --avatar-border: 3px solid rgba(100, 100, 100, 0.5);
-    --profile-bg: rgba(20, 20, 20, 0.95);
-    --animation-speed: 0.6s;
-    --pop-in-delay: 0.1s;
-}
-
-/* GLOBAL STYLING */
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--text-color); min-height:100vh; padding:2rem; overflow-x:hidden; }
-
-/* HEADER */
-.header { text-align:center; margin-bottom:3rem; animation: slideDown var(--animation-speed) ease-out; }
-.header h1 { font-family:var(--font-title); font-size:clamp(2rem,5vw,4rem); color:#e0e0e0; text-shadow:0 2px 10px rgba(0,0,0,0.8); margin-bottom:0.5rem; }
-.header p { font-size:clamp(1rem,2vw,1.2rem); color: rgba(200,200,200,0.7); }
-
-/* PLAYER COUNT */
-#playerCount { margin-top:8px; font-size:1rem; color:rgba(200,200,200,0.8); opacity:0; animation: fadeInCount 1s forwards; }
-
-/* SETTINGS MENU TOP LEFT */
-.settings-menu { position:fixed; top:20px; left:20px; z-index:9999; font-family:var(--font-main); }
-.settings-btn { background-color:#4a4a4a; color:#fff; border:none; font-size:1.5rem; padding:8px 12px; border-radius:8px; cursor:pointer; transition: background-color 0.2s, transform 0.2s; }
-.settings-btn:hover { background-color:#666666; transform:scale(1.1); }
-.settings-dropdown { display:none; flex-direction:column; margin-top:5px; background-color:rgba(20,20,20,0.95); border:2px solid rgba(80,80,80,0.3); border-radius:8px; overflow:hidden; animation: fadeIn 0.3s ease-out forwards; }
-.settings-option { background:none; border:none; color:#e0e0e0; padding:10px 16px; text-align:left; cursor:pointer; transition: background-color 0.2s; }
-.settings-option:hover { background-color: rgba(100,100,100,0.2); }
-.settings-list { margin-top:10px; display:flex; flex-direction:column; gap:10px; }
-.settings-list a { display:flex; align-items:center; gap:10px; text-decoration:none; color:#e0e0e0; background:rgba(30,30,30,0.9); border:2px solid rgba(80,80,80,0.3); border-radius:12px; padding:5px 10px; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
-.settings-list a:hover { transform:scale(1.05); box-shadow:0 5px 15px rgba(0,0,0,0.5); border-color: rgba(120,120,120,0.6); }
-.settings-list img { width:60px; height:40px; object-fit:cover; border-radius:6px; }
-
-/* DISCORD BUTTON TOP RIGHT */
-.contribute-btn { position:fixed; top:20px; right:20px; z-index:9999; display:flex; align-items:center; gap:8px; background-color:#7289da; color:white; text-decoration:none; font-weight:bold; padding:10px 16px; border-radius:8px; font-family:var(--font-main); font-size:1rem; transition: background-color 0.2s, transform 0.2s; }
-.contribute-btn:hover { background-color:#5b6eae; transform:scale(1.05); }
-.discord-icon { width:20px; height:20px; filter:invert(100%); }
-
-/* GAMES GRID */
-.games-grid { display:grid; grid-template-columns:repeat(var(--grid-columns), minmax(var(--grid-min-width),1fr)); gap:var(--grid-gap); max-width:1400px; margin:0 auto 4rem; }
-.game-card { background:var(--card-bg); border:2px solid var(--card-border); border-radius:20px; padding:var(--card-padding); text-decoration:none; color:var(--text-color); display:flex; flex-direction:column; align-items:center; gap:1rem; transition:all 0.3s cubic-bezier(0.4,0,0.2,1); cursor:pointer; position:relative; overflow:hidden; backdrop-filter:blur(10px); animation:popIn var(--animation-speed) ease-out backwards; }
-.game-card:nth-child(1) { animation-delay:calc(var(--pop-in-delay)*1); }
-.game-card:nth-child(2) { animation-delay:calc(var(--pop-in-delay)*2); }
-.game-card:nth-child(3) { animation-delay:calc(var(--pop-in-delay)*3); }
-.game-card:nth-child(4) { animation-delay:calc(var(--pop-in-delay)*4); }
-.game-card:nth-child(5) { animation-delay:calc(var(--pop-in-delay)*5); }
-.game-card:nth-child(6) { animation-delay:calc(var(--pop-in-delay)*6); }
-.game-card::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background:linear-gradient(135deg, rgba(60,60,60,0.1), rgba(40,40,40,0.1)); opacity:0; transition:opacity 0.3s ease; }
-.game-card:hover { transform:translateY(-10px) scale(var(--hover-scale)) rotate(var(--hover-rotate)); border-color:var(--card-hover-border); box-shadow:var(--hover-shadow); }
-.game-card:hover::before { opacity:1; }
-.game-card:active { transform:translateY(-5px) scale(0.98); }
-.game-thumbnail { width:var(--thumbnail-width); height:var(--thumbnail-height); object-fit:cover; border-radius:var(--thumbnail-border-radius); border:var(--thumbnail-border); transition:all 0.3s ease; position:relative; z-index:1; }
-.game-card:hover .game-thumbnail { transform:scale(1.1); box-shadow:0 8px 25px rgba(0,0,0,0.6); }
-.game-title { font-size:1.5rem; font-weight:bold; text-align:center; position:relative; z-index:1; text-shadow:0 2px 10px rgba(0,0,0,0.5); }
-
-/* DEV PROFILE */
-.dev-profile { background:var(--profile-bg); border:2px solid var(--card-border); border-radius:25px; padding:3rem 2rem; max-width:600px; margin:4rem auto 2rem; text-align:center; backdrop-filter:blur(10px); animation:fadeIn var(--animation-speed) ease-out 0.3s backwards; }
-.dev-avatar { width:var(--avatar-size); height:var(--avatar-size); border-radius:50%; border:var(--avatar-border); object-fit:cover; margin:0 auto 1.5rem; display:block; animation:pulse 2s ease-in-out infinite; box-shadow:0 0 20px rgba(0,0,0,0.5); }
-.dev-name { font-size:2rem; font-weight:bold; margin-bottom:0.5rem; color:#e0e0e0; }
-.dev-description { font-size:1.1rem; color:rgba(200,200,200,0.8); line-height:1.6; }
-
-/* ANIMATIONS */
-@keyframes slideDown { from{opacity:0; transform:translateY(-50px);} to{opacity:1; transform:translateY(0);} }
-@keyframes popIn { from{opacity:0; transform:scale(0.5) rotate(-10deg);} to{opacity:1; transform:scale(1) rotate(0deg);} }
-@keyframes fadeIn { from{opacity:0; transform:translateY(30px);} to{opacity:1; transform:translateY(0);} }
-@keyframes pulse { 0%,100%{transform:scale(1); box-shadow:0 0 20px rgba(0,0,0,0.5);} 50%{transform:scale(1.05); box-shadow:0 0 30px rgba(0,0,0,0.7);} }
-@keyframes fadeInCount { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: translateY(0); } }
-
-/* RESPONSIVE */
-@media (max-width:768px) {
-    body{padding:1rem;}
-    .games-grid{grid-template-columns:1fr; gap:1.5rem;}
-    .game-card{padding:1.2rem;}
-    .game-thumbnail{width:100%; max-width:var(--thumbnail-width);}
-    .dev-profile{padding:2rem 1.5rem;}
-    .game-card:hover{transform:translateY(-5px) scale(1.02);}
-}
-@media (max-width:480px){
-    .header h1{font-size:2rem;}
-    .game-title{font-size:1.2rem;}
-    .dev-avatar{width:100px;height:100px;}
-    .dev-name{font-size:1.5rem;}
-}
+body { margin:0; overflow:hidden; font-family:sans-serif; background:#222; }
+#ui { position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.85); padding:10px; border-radius:8px; z-index:10; }
+#ui h3 { margin:0 0 5px 0; color:#333; }
+#ui p { margin:2px 0; color:#222; }
 </style>
+</head>
 <body>
-
-<header class="header">
-<h1>🎮 MINI ARCADE 🎮</h1>
-<p>Choose Your Favourite Game!</p>
-<p id="playerCount">Current Players Online: 0</p>
-</header>
-
-<!-- SETTINGS MENU TOP LEFT -->
-<div class="settings-menu">
-<button class="settings-btn">⋯</button>
-<div class="settings-dropdown">
-<button class="settings-option" data-category="mobile">Best Mobile Games</button>
-<button class="settings-option" data-category="pc">Best PC Games</button>
-<button class="settings-option" data-category="overall">Best Overall Games</button>
-</div>
-<div class="settings-list"></div>
+<div id="ui">
+<h3>Mini-Maze 2.5D Arcade</h3>
+<p>Arrow keys / WASD / swipe: move</p>
+<p id="status">Level: 1 | Score: 0 | Time: 30 | Highscore: 0</p>
 </div>
 
-<!-- DISCORD BUTTON TOP RIGHT -->
-<a href="https://discord.com/users/1300068854176809081" target="_blank" class="contribute-btn">
-<img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/discord.svg" alt="Discord" class="discord-icon">
-Contribute
-</a>
+<!-- Audio -->
+<audio id="starSound" src="https://freesound.org/data/previews/320/320655_5260876-lq.mp3"></audio>
+<audio id="trapSound" src="https://freesound.org/data/previews/198/198841_2859976-lq.mp3"></audio>
+<audio id="levelUpSound" src="https://freesound.org/data/previews/146/146725_2615114-lq.mp3"></audio>
 
-<!-- GAMES GRID -->
-<div class="games-grid" id="gamesGrid">
-
-<!-- All original 9 game cards -->
-<a href="pixel-miner.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459256112237908031/image0.jpg?ex=69629da8&is=69614c28&hm=67d4cb4e7be11c6a2d878eff61b2b9a01f9e9543d301b8f01de20a1cde714311&" alt="Mining Idle" class="game-thumbnail">
-<h3 class="game-title">Pixel Miner</h3>
-</a>
-
-<a href="ball-fangen.html" class="game-card">
-<img src="https://media.discordapp.net/attachments/1337835353826001058/1459256926440525865/IMG_3132.png?ex=69629e6a&is=69614cea&hm=873beb5c62ab576b7e556aed447b07987dbb687fffe39d904c877bc3831505c1&=&format=webp&quality=lossless&width=554&height=359" alt="Dont miss the Balls!" class="game-thumbnail">
-<h3 class="game-title">Catch the Balls</h3>
-</a>
-
-<a href="endless-runner.html" class="game-card">
-<img src="https://media.discordapp.net/attachments/1337835353826001058/1459256926058582109/IMG_3132.png?ex=69629e6a&is=69614cea&hm=a0ef5598ed5c3bb24b42dbba864a620db71c7ab8dd9b2c915d7ac32cc060585a&=&format=webp&quality=lossless&width=554&height=343" alt="A endless runner" class="game-thumbnail">
-<h3 class="game-title">Endless Runner</h3>
-</a>
-
-<a href="rocket-league.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459265473307742248/image.png?ex=6962a660&is=696154e0&hm=0d58582d1d0ae0bc1b42c697bbdfab366753219028ea852485588597acec59cd&" alt="Car Soccer" class="game-thumbnail">
-<h3 class="game-title">Car League</h3>
-</a>
-
-<a href="ballon-clicker.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459274151918440673/image.png?ex=6962ae75&is=69615cf5&hm=07971e5f97f27c74341001756d3d6c8c3237f77d379a78f50765520ea8c99a6f" alt="clicker" class="game-thumbnail">
-<h3 class="game-title">Ballon Clicker</h3>
-</a>
-
-<a href="gravity-flipper.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459277030528122982/image.png?ex=6962b124&is=69615fa4&hm=ba8f67f039dc92f98acf0be35c02a6fd715e0b9da51afa837a3844f5960fe535&" alt="flipper" class="game-thumbnail">
-<h3 class="game-title">Gravity Flipper</h3>
-</a>
-
-<a href="geometry-dash.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459280359656259734/image.png?ex=6962b43d&is=696162bd&hm=ccf25cc89fa0b70da2f32a03d642943a43f962207f94bebaaee08c2b0f1500e9&" alt="runner" class="game-thumbnail">
-<h3 class="game-title">Geometry Dasher</h3>
-</a>
-
-<a href="dino-run.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459288128790593636/image.png?ex=6962bb7a&is=696169fa&hm=6475eb530f1869ccbbfef6853f30d760479f2e5904806bac7babe031aa74f1cd&" alt="runner" class="game-thumbnail">
-<h3 class="game-title">Dino Runner</h3>
-</a>
-
-<a href="towerdefense.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459299141879599256/image.png?ex=6962c5bb&is=6961743b&hm=95fedc2e1e642ec7f4f8faa46a4ab091d92b965213563d44c1729bd8e2a0aa3f&" alt="runner" class="game-thumbnail">
-<h3 class="game-title">TD Master</h3>
-</a>
-
-    <a href="minimaze.html" class="game-card">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459330071067103293/image.png?ex=6962e289&is=69619109&hm=39ce236e6a8dce84054a188888ae41dcdfee0b4f7ce90b2cf437a7bbe573e8b8&" alt="runner" class="game-thumbnail">
-<h3 class="game-title">Mini Maze</h3>
-</a>
-
-</div>
-
-<!-- DEV PROFILE -->
-<div class="dev-profile">
-<img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459256897101103316/image0.jpg?ex=69629e63&is=69614ce3&hm=3ff7e258e336a3b28b75fba3760bf6eedcf496fd2a661534f740cc7f083d9416&" alt="Developer Avatar" class="dev-avatar">
-<h2 class="dev-name">JunJun</h2>
-<p class="dev-description">
-All these Games are made by me!🎮<br>
-Have fun! If you find any Bugs add me on Discord:junjun0558
-</p>
-</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 
 <script>
-// SETTINGS MENU TOGGLE
-const settingsBtn = document.querySelector('.settings-btn');
-const settingsDropdown = document.querySelector('.settings-dropdown');
-const settingsOptions = document.querySelectorAll('.settings-option');
-const settingsList = document.querySelector('.settings-list');
+let scene, camera, renderer;
+let gridSize=5, cellSize=4, level=1, score=0, timer=30;
+let highscore = localStorage.getItem('miniMazeHighscore')||0;
+let mazeMap=[], playerPos={x:0,y:0}, exitPos={x:0,y:0};
+let playerMesh;
+let stars=[], traps=[], particlesGroup=[];
+let interval, touchStart=null;
 
-settingsBtn.addEventListener('click', () => {
-    settingsDropdown.style.display = settingsDropdown.style.display === 'flex' ? 'none' : 'flex';
-});
+init();
+animate();
+startTimer();
 
-const categories = {
-    mobile: [
-        {title:"Catch the Balls", url:"ball-fangen.html", img:"https://media.discordapp.net/attachments/1337835353826001058/1459256926440525865/IMG_3132.png?ex=69629e6a&is=69614cea&hm=873beb5c62ab576b7e556aed447b07987dbb687fffe39d904c877bc3831505c1&=&format=webp&quality=lossless&width=554&height=359"},
-        {title:"Ballon Clicker", url:"ballon-clicker.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459274151918440673/image.png?ex=6962ae75&is=69615cf5&hm=07971e5f97f27c74341001756d3d6c8c3237f77d379a78f50765520ea8c99a6f"},
-        {title:"Pixel Miner", url:"pixel-miner.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459256112237908031/image0.jpg?ex=69629da8&is=69614c28&hm=67d4cb4e7be11c6a2d878eff61b2b9a01f9e9543d301b8f01de20a1cde714311&"}
-    ],
-    pc: [
-        {title:"TD Master", url:"towerdefense.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459299141879599256/image.png?ex=6962c5bb&is=6961743b&hm=95fedc2e1e642ec7f4f8faa46a4ab091d92b965213563d44c1729bd8e2a0aa3f"},
-        {title:"Pixel Miner", url:"pixel-miner.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459256112237908031/image0.jpg?ex=69629da8&is=69614c28&hm=67d4cb4e7be11c6a2d878eff61b2b9a01f9e9543d301b8f01de20a1cde714311&"},
-        {title:"Geometry Dasher", url:"geometry-dash.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459280359656259734/image.png?ex=6962b43d&is=696162bd&hm=ccf25cc89fa0b70da2f32a03d642943a43f962207f94bebaaee08c2b0f1500e9&"}
-    ],
-    overall: [
-        {title:"TD Master", url:"towerdefense.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459299141879599256/image.png?ex=6962c5bb&is=6961743b&hm=95fedc2e1e642ec7f4f8faa46a4ab091d92b965213563d44c1729bd8e2a0aa3f"},
-        {title:"Pixel Miner", url:"pixel-miner.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459256112237908031/image0.jpg?ex=69629da8&is=69614c28&hm=67d4cb4e7be11c6a2d878eff61b2b9a01f9e9543d301b8f01de20a1cde714311&"},
-        {title:"Ballon Clicker", url:"ballon-clicker.html", img:"https://cdn.discordapp.com/attachments/1337835353826001058/1459274151918440673/image.png?ex=6962ae75&is=69615cf5&hm=07971e5f97f27c74341001756d3d6c8c3237f77d379a78f50765520ea8c99a6f"}
-    ]
-};
+function playSound(id){ const audio=document.getElementById(id); if(audio){ audio.currentTime=0; audio.play(); } }
 
-settingsOptions.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-        const category = btn.dataset.category;
-        settingsList.innerHTML = '';
-        categories[category].forEach(game=>{
-            const a = document.createElement('a');
-            a.href = game.url;
-            a.innerHTML = `<img src="${game.img}" alt="${game.title}"><span>${game.title}</span>`;
-            settingsList.appendChild(a);
-        });
-    });
-});
+function init(){
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x222222);
 
-// TOUCH FEEDBACK
-document.querySelectorAll('.game-card').forEach(card=>{
-    card.addEventListener('touchstart',function(){this.style.transform='translateY(-5px) scale(0.98)';});
-    card.addEventListener('touchend',function(){this.style.transform='';});
-});
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(gridSize*cellSize/2, 20, gridSize*cellSize*1.2);
+    camera.lookAt(gridSize*cellSize/2, 0, gridSize*cellSize/2);
 
-// FAKE PLAYER COUNT
-function updatePlayerCount() {
-    const count = Math.floor(Math.random() * (50 - 20 + 1)) + 20;
-    const playerCountEl = document.getElementById('playerCount');
-    playerCountEl.textContent = `Current Players Online: ${count}`;
-    playerCountEl.style.animation = 'none';
-    void playerCountEl.offsetWidth;
-    playerCountEl.style.animation = 'fadeInCount 1s forwards';
+    renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const light = new THREE.DirectionalLight(0xffffff,1);
+    light.position.set(10,50,10);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff,0.5));
+
+    const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(gridSize*cellSize, gridSize*cellSize),
+        new THREE.MeshStandardMaterial({color:0x333333})
+    );
+    floor.rotation.x=-Math.PI/2;
+    scene.add(floor);
+
+    generateMaze();
+    createPlayer();
+    createExit();
+    updateStatus();
+
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('touchstart', e=>{ touchStart = e.touches[0]; });
+    window.addEventListener('touchend', handleSwipe);
 }
-updatePlayerCount();
-setInterval(updatePlayerCount, 3000);
+
+// --- Maze ---
+function generateMaze(){
+    mazeMap = Array(gridSize).fill(0).map(()=>Array(gridSize).fill(0));
+    stars=[]; traps=[];
+
+    // Remove previous objects
+    for(let i=scene.children.length-1;i>=0;i--){
+        const obj = scene.children[i];
+        if(obj.userData && obj.userData.type && ["wall","star","trap","exit"].includes(obj.userData.type)){
+            scene.remove(obj);
+        }
+    }
+
+    for(let y=0;y<gridSize;y++){
+        for(let x=0;x<gridSize;x++){
+            if(x===0 && y===0){ mazeMap[y][x]=0; continue; }
+            if(x===gridSize-1 && y===gridSize-1){ mazeMap[y][x]=4; exitPos={x,y}; createExitMesh(x,y); continue; }
+            const rand=Math.random();
+            if(rand<0.2){ mazeMap[y][x]=1; createWall(x,y); }
+            else if(rand<0.3){ mazeMap[y][x]=2; createStar(x,y); }
+            else if(rand<0.35){ mazeMap[y][x]=3; createTrap(x,y); }
+            else mazeMap[y][x]=0;
+        }
+    }
+}
+
+function createWall(x,y){
+    const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(cellSize,cellSize*0.7,cellSize),
+        new THREE.MeshStandardMaterial({color:0x555555})
+    );
+    cube.position.set(x*cellSize+cellSize/2, cellSize*0.35, y*cellSize+cellSize/2);
+    cube.castShadow=true; cube.userData.type="wall";
+    scene.add(cube);
+}
+
+function createStar(x,y){
+    const star = new THREE.Mesh(
+        new THREE.BoxGeometry(cellSize/2, cellSize/2, cellSize/2),
+        new THREE.MeshStandardMaterial({color:0xffff00})
+    );
+    star.position.set(x*cellSize+cellSize/2, cellSize/4, y*cellSize+cellSize/2);
+    star.userData.type="star";
+    scene.add(star);
+    stars.push({x,y,mesh:star});
+}
+
+function createTrap(x,y){
+    const trap = new THREE.Mesh(
+        new THREE.BoxGeometry(cellSize/2, cellSize/4, cellSize/2),
+        new THREE.MeshStandardMaterial({color:0x5555ff, emissive:0x0000ff, emissiveIntensity:0.3})
+    );
+    trap.position.set(x*cellSize+cellSize/2, cellSize/8, y*cellSize+cellSize/2);
+    trap.userData.type="trap";
+    scene.add(trap);
+    traps.push({x,y,mesh:trap});
+}
+
+function createExitMesh(x,y){
+    const exitMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(cellSize,cellSize,cellSize),
+        new THREE.MeshStandardMaterial({color:0x55ff55})
+    );
+    exitMesh.position.set(x*cellSize+cellSize/2,cellSize/2,y*cellSize+cellSize/2);
+    exitMesh.userData.type="exit";
+    scene.add(exitMesh);
+}
+
+// --- Player ---
+function createPlayer(){
+    if(playerMesh) scene.remove(playerMesh);
+    const geom = new THREE.BoxGeometry(cellSize*0.8,cellSize*0.8,cellSize*0.8);
+    const mat = new THREE.MeshStandardMaterial({color:0xff5555});
+    playerMesh = new THREE.Mesh(geom,mat);
+    playerMesh.position.set(playerPos.x*cellSize+cellSize/2, cellSize/2, playerPos.y*cellSize+cellSize/2);
+    scene.add(playerMesh);
+}
+
+// --- Controls ---
+function canMove(nx,ny){ return nx>=0 && ny>=0 && nx<gridSize && ny<gridSize && mazeMap[ny][nx]!==1; }
+
+function handleKey(e){
+    let dx=0,dy=0;
+    if(e.key==='ArrowUp'||e.key==='w') dy=-1;
+    else if(e.key==='ArrowDown'||e.key==='s') dy=1;
+    else if(e.key==='ArrowLeft'||e.key==='a') dx=-1;
+    else if(e.key==='ArrowRight'||e.key==='d') dx=1;
+    movePlayer(dx,dy);
+}
+
+function handleSwipe(e){
+    if(!touchStart) return;
+    const touchEnd = e.changedTouches[0];
+    const dx = touchEnd.clientX - touchStart.clientX;
+    const dy = touchEnd.clientY - touchStart.clientY;
+    if(Math.abs(dx)>Math.abs(dy)) dx>0?movePlayer(1,0):movePlayer(-1,0);
+    else dy>0?movePlayer(0,1):movePlayer(0,-1);
+    touchStart=null;
+}
+
+function movePlayer(dx,dy){
+    const nx=playerPos.x+dx, ny=playerPos.y+dy;
+    if(!canMove(nx,ny)) return;
+    playerPos.x=nx; playerPos.y=ny;
+    playerMesh.position.set(nx*cellSize+cellSize/2, cellSize/2, ny*cellSize+cellSize/2);
+
+    // Stars
+    for(let i=stars.length-1;i>=0;i--){
+        if(stars[i].x===nx && stars[i].y===ny){
+            scene.remove(stars[i].mesh); stars.splice(i,1);
+            score+=10; playSound('starSound'); updateStatus();
+        }
+    }
+
+    // Traps
+    for(let t of traps){ if(t.x===nx && t.y===ny){ timer=Math.max(1,timer-5); playSound('trapSound'); updateStatus(); } }
+
+    // Exit
+    if(nx===exitPos.x && ny===exitPos.y){
+        playSound('levelUpSound');
+        level++; gridSize=Math.min(gridSize+1,10); playerPos={x:0,y:0};
+        generateMaze(); createPlayer(); updateStatus();
+    }
+
+    // Camera follow
+    camera.position.set(playerMesh.position.x, camera.position.y, playerMesh.position.z + gridSize*cellSize*0.5);
+    camera.lookAt(playerMesh.position);
+}
+
+// --- UI / Timer ---
+function updateStatus(){
+    document.getElementById('status').textContent = `Level: ${level} | Score: ${score} | Time: ${timer} | Highscore: ${highscore}`;
+    if(score>highscore){ highscore=score; localStorage.setItem('miniMazeHighscore',highscore); }
+}
+
+function startTimer(){
+    clearInterval(interval);
+    interval=setInterval(()=>{
+        timer--;
+        if(timer<=0){
+            alert('Time up!');
+            level=1; gridSize=5; score=0; timer=30; generateMaze(); createPlayer(); updateStatus();
+        }
+        updateStatus();
+    },1000);
+}
+
+// --- Animate ---
+function animate(){
+    requestAnimationFrame(animate);
+    renderer.render(scene,camera);
+}
 </script>
 </body>
 </html>
