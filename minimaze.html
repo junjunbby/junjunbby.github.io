@@ -2,22 +2,47 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Mini-Maze 2D Neon Arcade – Exit Pflicht</title>
+<title>Mini-Maze 2D Neon Arcade – Container Version</title>
 <style>
-body { margin:0; background:#111; font-family:sans-serif; overflow:hidden; }
-canvas { display:block; margin:0 auto; transition: transform 0.05s ease; }
+body { margin:0; font-family:sans-serif; background:#222; color:white; }
+#dashboard {
+    padding:20px;
+}
+#gameContainer {
+    width:500px;
+    height:500px;
+    margin: 20px auto;
+    background:#111;
+    border: 3px solid #0ff;
+    border-radius:10px;
+    position: relative;
+}
+canvas { 
+    width:100%; 
+    height:100%; 
+    display:block;
+}
 #ui {
-  position:absolute; top:10px; left:10px; color:white;
-  background: rgba(0,0,0,0.5); padding:10px; border-radius:6px;
-  font-family:sans-serif; font-weight:bold; text-shadow:0 0 5px #0ff;
+    position:absolute; top:10px; left:10px; color:white;
+    background: rgba(0,0,0,0.5); padding:5px 10px; border-radius:6px;
+    font-family:sans-serif; font-weight:bold; text-shadow:0 0 5px #0ff;
+    z-index:10;
 }
 </style>
 </head>
 <body>
-<div id="ui">
-<p id="status">Level: 1 | Score: 0 | Combo: 0 | Time: 30 | Highscore: 0</p>
+
+<div id="dashboard">
+    <h1>Mein Dashboard</h1>
+    <p>Hier bleiben deine Dashboards-Elemente sichtbar, während das Mini-Maze in einem Container läuft.</p>
 </div>
-<canvas id="gameCanvas" width="500" height="500"></canvas>
+
+<div id="gameContainer">
+    <div id="ui">
+        <p id="status">Level: 1 | Score: 0 | Combo: 0 | Time: 30 | Highscore: 0</p>
+    </div>
+    <canvas id="gameCanvas" width="500" height="500"></canvas>
+</div>
 
 <!-- Sounds -->
 <audio id="starSound" src="https://freesound.org/data/previews/320/320655_5260876-lq.mp3"></audio>
@@ -27,6 +52,7 @@ canvas { display:block; margin:0 auto; transition: transform 0.05s ease; }
 
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script>
+// Canvas Setup
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let tileSize = 40;
@@ -36,7 +62,6 @@ let highscore = localStorage.getItem('miniMazeHighscore')||0;
 
 let mazeMap=[], player={x:0,y:0,px:0,py:0}, exit={x:4,y:4};
 let stars=[], traps=[], particles=[], playerTrails=[], comboPopups=[];
-let touchStart=null;
 let showLevelIntro = true;
 let levelIntroAlpha = 1;
 
@@ -44,6 +69,7 @@ let comboTimer = null;
 const comboDuration = 2000;
 let pulseIntensity = 0;
 
+// Background stars
 let bgStars=[];
 for(let i=0;i<50;i++){ bgStars.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, size:Math.random()*2+1, speed:Math.random()*0.3+0.1}); }
 
@@ -57,8 +83,6 @@ bgMusic.volume = 0.3;
 bgMusic.play();
 
 window.addEventListener('keydown', handleKey);
-window.addEventListener('touchstart', e=>{ touchStart = e.touches[0]; });
-window.addEventListener('touchend', handleSwipe);
 
 function playSound(id){ const audio=document.getElementById(id); if(audio){ audio.currentTime=0; audio.play(); } }
 
@@ -87,17 +111,6 @@ function handleKey(e){
     else if(e.key==='ArrowLeft'||e.key==='a') dx=-1;
     else if(e.key==='ArrowRight'||e.key==='d') dx=1;
     movePlayer(dx,dy);
-}
-
-function handleSwipe(e){
-    if(showLevelIntro) return;
-    if(!touchStart) return;
-    const touchEnd = e.changedTouches[0];
-    const dx = touchEnd.clientX - touchStart.clientX;
-    const dy = touchEnd.clientY - touchStart.clientY;
-    if(Math.abs(dx)>Math.abs(dy)) dx>0?movePlayer(1,0):movePlayer(-1,0);
-    else dy>0?movePlayer(0,1):movePlayer(0,-1);
-    touchStart=null;
 }
 
 function canMove(x,y){ return x>=0 && y>=0 && x<gridSize && y<gridSize && mazeMap[y][x]!==1; }
@@ -154,7 +167,6 @@ function collectStars(){
             if(combo>=3) shakeCanvas(combo>=5 ? 8 : 4);
             if(combo>=3) pulseIntensity = combo>=5 ? 0.3 : 0.15;
 
-            // Music speed
             if(combo>=5) bgMusic.playbackRate = 1.5;
             else if(combo>=3) bgMusic.playbackRate = 1.2;
             else bgMusic.playbackRate = 1;
@@ -291,5 +303,6 @@ function showLevelIntroAnimation(){
     gsap.to(window, {duration:1.2, levelIntroAlpha:0, onUpdate:()=>{}, onComplete:()=>{showLevelIntro=false;}});
 }
 </script>
+
 </body>
 </html>
