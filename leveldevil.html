@@ -1,0 +1,771 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { AlertCircle, Trophy, Key } from 'lucide-react';
+
+const LevelDevil = () => {
+  const canvasRef = useRef(null);
+  const [currentLevel, setCurrentLevel] = useState(1);
+  const [gameState, setGameState] = useState('playing');
+  const [playerPos, setPlayerPos] = useState({ x: 50, y: 300 });
+  const [velocity, setVelocity] = useState({ x: 0, y: 0 });
+  const [keys, setKeys] = useState({});
+  const [deaths, setDeaths] = useState(0);
+  const [totalDeaths, setTotalDeaths] = useState(0);
+  const [gravityFlipped, setGravityFlipped] = useState(false);
+  const [collectedKeys, setCollectedKeys] = useState([]);
+  const [completedLevels, setCompletedLevels] = useState([]);
+
+  const GRAVITY = 0.6;
+  const JUMP_FORCE = -12;
+  const MOVE_SPEED = 5;
+  const PLAYER_SIZE = 30;
+  const CANVAS_HEIGHT = 400;
+
+  // Generate level data based on level number
+  const generateLevel = (levelNum) => {
+    const level = {
+      platforms: [],
+      spikes: [],
+      movingPlatforms: [],
+      fallingFloors: [],
+      exits: [],
+      fakeExits: [],
+      gravityFlips: [],
+      invisibleHazards: [],
+      ceilingTraps: [],
+      enemies: [],
+      timedPlatforms: [],
+      secretKeys: [],
+      startPos: { x: 50, y: 300 }
+    };
+
+    // Levels 1-10: Tutorial / Basic Platforming
+    if (levelNum <= 10) {
+      level.platforms.push({ x: 0, y: 370, width: 800, height: 30 });
+      
+      if (levelNum === 1) {
+        level.spikes.push({ x: 300, y: 355, width: 40, height: 15 });
+        level.spikes.push({ x: 450, y: 355, width: 40, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 2) {
+        level.spikes.push({ x: 200, y: 355, width: 40, height: 15 });
+        level.spikes.push({ x: 300, y: 355, width: 60, height: 15 });
+        level.spikes.push({ x: 500, y: 355, width: 40, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 3) {
+        level.platforms.push({ x: 200, y: 300, width: 100, height: 20 });
+        level.platforms.push({ x: 400, y: 250, width: 100, height: 20 });
+        level.spikes.push({ x: 320, y: 355, width: 60, height: 15 });
+        level.exits.push({ x: 450, y: 190, width: 40, height: 60 });
+      } else if (levelNum === 4) {
+        level.movingPlatforms.push({ x: 250, y: 300, width: 100, height: 20, vx: 2, minX: 250, maxX: 450 });
+        level.spikes.push({ x: 500, y: 355, width: 60, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 5) {
+        level.fallingFloors.push({ x: 200, y: 370, width: 150, height: 20, fallen: false });
+        level.fallingFloors.push({ x: 450, y: 370, width: 150, height: 20, fallen: false });
+        level.exits.push({ x: 650, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 6) {
+        level.platforms.push({ x: 150, y: 320, width: 80, height: 20 });
+        level.platforms.push({ x: 300, y: 270, width: 80, height: 20 });
+        level.platforms.push({ x: 450, y: 220, width: 80, height: 20 });
+        level.spikes.push({ x: 250, y: 355, width: 40, height: 15 });
+        level.exits.push({ x: 480, y: 160, width: 40, height: 60 });
+      } else if (levelNum === 7) {
+        level.movingPlatforms.push({ x: 200, y: 320, width: 100, height: 20, vx: 3, minX: 200, maxX: 500 });
+        level.spikes.push({ x: 350, y: 355, width: 80, height: 15 });
+        level.fallingFloors.push({ x: 600, y: 370, width: 100, height: 20, fallen: false });
+        level.exits.push({ x: 720, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 8) {
+        level.platforms.push({ x: 180, y: 300, width: 100, height: 20 });
+        level.platforms.push({ x: 350, y: 250, width: 100, height: 20 });
+        level.platforms.push({ x: 520, y: 200, width: 100, height: 20 });
+        level.spikes.push({ x: 300, y: 355, width: 40, height: 15 });
+        level.spikes.push({ x: 470, y: 355, width: 40, height: 15 });
+        level.exits.push({ x: 560, y: 140, width: 40, height: 60 });
+      } else if (levelNum === 9) {
+        level.platforms.push({ x: 200, y: 300, width: 100, height: 20 });
+        level.fakeExits.push({ x: 250, y: 240, width: 40, height: 60 });
+        level.spikes.push({ x: 400, y: 355, width: 60, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 10) {
+        level.movingPlatforms.push({ x: 200, y: 300, width: 100, height: 20, vx: 2.5, minX: 200, maxX: 400 });
+        level.fallingFloors.push({ x: 450, y: 370, width: 120, height: 20, fallen: false });
+        level.spikes.push({ x: 600, y: 355, width: 50, height: 15 });
+        level.fakeExits.push({ x: 350, y: 310, width: 40, height: 60 });
+        level.exits.push({ x: 720, y: 310, width: 40, height: 60 });
+      }
+    }
+    // Levels 11-30: Advanced Platforming
+    else if (levelNum <= 30) {
+      level.platforms.push({ x: 0, y: 370, width: 800, height: 30 });
+      
+      if (levelNum === 11) {
+        level.gravityFlips.push({ x: 300, y: 300, width: 40, height: 40 });
+        level.platforms.push({ x: 0, y: 50, width: 800, height: 30 });
+        level.spikes.push({ x: 450, y: 65, width: 60, height: 15 });
+        level.exits.push({ x: 700, y: 80, width: 40, height: 60 });
+      } else if (levelNum === 13) {
+        level.invisibleHazards.push({ x: 300, y: 355, width: 80, height: 15, visible: false });
+        level.spikes.push({ x: 500, y: 355, width: 60, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 15) {
+        level.platforms.push({ x: 200, y: 280, width: 100, height: 20 });
+        level.secretKeys.push({ x: 230, y: 250, collected: false });
+        level.spikes.push({ x: 400, y: 355, width: 60, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 19) {
+        level.platforms.push({ x: 200, y: 300, width: 100, height: 20 });
+        level.ceilingTraps.push({ x: 220, y: 230, width: 60, height: 15 });
+        level.spikes.push({ x: 400, y: 355, width: 60, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else if (levelNum === 20) {
+        level.enemies.push({ x: 300, y: 340, width: 30, height: 30, vx: 2, minX: 250, maxX: 500 });
+        level.spikes.push({ x: 550, y: 355, width: 60, height: 15 });
+        level.exits.push({ x: 700, y: 310, width: 40, height: 60 });
+      } else {
+        // Levels 21-30: Timed platforms and combinations
+        level.timedPlatforms.push({ x: 250, y: 300, width: 100, height: 20, timer: 0, maxTimer: 60 });
+        level.movingPlatforms.push({ x: 450, y: 250, width: 100, height: 20, vx: 3, minX: 450, maxX: 600 });
+        level.spikes.push({ x: 350, y: 355, width: 60, height: 15 });
+        level.fakeExits.push({ x: 400, y: 310, width: 40, height: 60 });
+        level.exits.push({ x: 720, y: 310, width: 40, height: 60 });
+      }
+    }
+    // Levels 31-60: Multi-Layered Puzzles
+    else if (levelNum <= 60) {
+      level.platforms.push({ x: 0, y: 370, width: 800, height: 30 });
+      level.platforms.push({ x: 150, y: 310, width: 100, height: 20 });
+      level.platforms.push({ x: 300, y: 250, width: 100, height: 20 });
+      level.platforms.push({ x: 450, y: 190, width: 100, height: 20 });
+      level.platforms.push({ x: 600, y: 250, width: 100, height: 20 });
+      
+      level.fallingFloors.push({ x: 150, y: 310, width: 100, height: 20, fallen: false });
+      level.spikes.push({ x: 270, y: 355, width: 50, height: 15 });
+      level.spikes.push({ x: 420, y: 235, width: 50, height: 15 });
+      level.invisibleHazards.push({ x: 560, y: 355, width: 60, height: 15, visible: false });
+      level.fakeExits.push({ x: 500, y: 130, width: 40, height: 60 });
+      level.exits.push({ x: 640, y: 190, width: 40, height: 60 });
+      
+      if (levelNum % 5 === 0) {
+        level.secretKeys.push({ x: 320, y: 220, collected: false });
+      }
+    }
+    // Levels 61-100: Extreme Traps & Puzzle Complexity
+    else if (levelNum <= 100) {
+      level.platforms.push({ x: 0, y: 370, width: 800, height: 30 });
+      level.platforms.push({ x: 0, y: 50, width: 800, height: 30 });
+      
+      level.movingPlatforms.push({ x: 150, y: 300, width: 80, height: 20, vx: 3.5, minX: 150, maxX: 350 });
+      level.movingPlatforms.push({ x: 450, y: 200, width: 80, height: 20, vx: -3, minX: 450, maxX: 650 });
+      
+      level.timedPlatforms.push({ x: 250, y: 250, width: 100, height: 20, timer: 0, maxTimer: 45 });
+      
+      level.gravityFlips.push({ x: 400, y: 150, width: 40, height: 40 });
+      
+      level.spikes.push({ x: 280, y: 355, width: 50, height: 15 });
+      level.spikes.push({ x: 500, y: 355, width: 50, height: 15 });
+      level.ceilingTraps.push({ x: 350, y: 65, width: 60, height: 15 });
+      
+      level.enemies.push({ x: 600, y: 340, width: 30, height: 30, vx: 2.5, minX: 550, maxX: 750 });
+      
+      level.fakeExits.push({ x: 300, y: 310, width: 40, height: 60 });
+      level.fakeExits.push({ x: 200, y: 80, width: 40, height: 60 });
+      level.exits.push({ x: 720, y: 310, width: 40, height: 60 });
+    }
+    // Levels 101-150: Boss-Style Puzzle Mechanics
+    else if (levelNum <= 150) {
+      level.platforms.push({ x: 0, y: 370, width: 800, height: 30 });
+      level.platforms.push({ x: 0, y: 50, width: 800, height: 30 });
+      level.platforms.push({ x: 100, y: 280, width: 80, height: 20 });
+      level.platforms.push({ x: 250, y: 220, width: 80, height: 20 });
+      level.platforms.push({ x: 400, y: 160, width: 80, height: 20 });
+      level.platforms.push({ x: 550, y: 220, width: 80, height: 20 });
+      level.platforms.push({ x: 650, y: 280, width: 80, height: 20 });
+      
+      level.movingPlatforms.push({ x: 180, y: 180, width: 60, height: 20, vx: 2.8, minX: 180, maxX: 320 });
+      level.movingPlatforms.push({ x: 480, y: 280, width: 60, height: 20, vx: -2.8, minX: 480, maxX: 620 });
+      
+      level.fallingFloors.push({ x: 250, y: 220, width: 80, height: 20, fallen: false });
+      level.timedPlatforms.push({ x: 400, y: 160, width: 80, height: 20, timer: 0, maxTimer: 40 });
+      
+      level.gravityFlips.push({ x: 350, y: 120, width: 40, height: 40 });
+      level.gravityFlips.push({ x: 450, y: 320, width: 40, height: 40 });
+      
+      level.spikes.push({ x: 200, y: 355, width: 40, height: 15 });
+      level.spikes.push({ x: 340, y: 355, width: 50, height: 15 });
+      level.spikes.push({ x: 520, y: 355, width: 40, height: 15 });
+      level.ceilingTraps.push({ x: 280, y: 65, width: 50, height: 15 });
+      level.ceilingTraps.push({ x: 450, y: 65, width: 50, height: 15 });
+      
+      level.invisibleHazards.push({ x: 600, y: 355, width: 60, height: 15, visible: false });
+      
+      level.enemies.push({ x: 300, y: 340, width: 30, height: 30, vx: 2, minX: 200, maxX: 400 });
+      level.enemies.push({ x: 500, y: 340, width: 30, height: 30, vx: -2.5, minX: 450, maxX: 600 });
+      
+      level.fakeExits.push({ x: 150, y: 310, width: 40, height: 60 });
+      level.fakeExits.push({ x: 400, y: 80, width: 40, height: 60 });
+      level.fakeExits.push({ x: 600, y: 310, width: 40, height: 60 });
+      level.exits.push({ x: 680, y: 220, width: 40, height: 60 });
+      
+      if (levelNum % 10 === 0) {
+        level.secretKeys.push({ x: 110, y: 250, collected: false });
+      }
+    }
+    // Levels 151-200+: Expert / Speedrun Challenges
+    else {
+      level.platforms.push({ x: 0, y: 370, width: 800, height: 30 });
+      level.platforms.push({ x: 0, y: 50, width: 800, height: 30 });
+      level.platforms.push({ x: 80, y: 300, width: 60, height: 20 });
+      level.platforms.push({ x: 180, y: 240, width: 60, height: 20 });
+      level.platforms.push({ x: 280, y: 180, width: 60, height: 20 });
+      level.platforms.push({ x: 380, y: 120, width: 60, height: 20 });
+      level.platforms.push({ x: 480, y: 180, width: 60, height: 20 });
+      level.platforms.push({ x: 580, y: 240, width: 60, height: 20 });
+      level.platforms.push({ x: 680, y: 300, width: 60, height: 20 });
+      
+      level.movingPlatforms.push({ x: 140, y: 270, width: 50, height: 20, vx: 4, minX: 140, maxX: 240 });
+      level.movingPlatforms.push({ x: 340, y: 150, width: 50, height: 20, vx: -4, minX: 340, maxX: 440 });
+      level.movingPlatforms.push({ x: 540, y: 210, width: 50, height: 20, vx: 4, minX: 540, maxX: 640 });
+      
+      level.fallingFloors.push({ x: 180, y: 240, width: 60, height: 20, fallen: false });
+      level.fallingFloors.push({ x: 480, y: 180, width: 60, height: 20, fallen: false });
+      
+      level.timedPlatforms.push({ x: 280, y: 180, width: 60, height: 20, timer: 0, maxTimer: 35 });
+      level.timedPlatforms.push({ x: 580, y: 240, width: 60, height: 20, timer: 0, maxTimer: 35 });
+      
+      level.gravityFlips.push({ x: 200, y: 200, width: 40, height: 40 });
+      level.gravityFlips.push({ x: 400, y: 90, width: 40, height: 40 });
+      level.gravityFlips.push({ x: 600, y: 200, width: 40, height: 40 });
+      
+      level.spikes.push({ x: 150, y: 355, width: 30, height: 15 });
+      level.spikes.push({ x: 250, y: 355, width: 30, height: 15 });
+      level.spikes.push({ x: 350, y: 355, width: 30, height: 15 });
+      level.spikes.push({ x: 450, y: 355, width: 30, height: 15 });
+      level.spikes.push({ x: 550, y: 355, width: 30, height: 15 });
+      level.spikes.push({ x: 650, y: 355, width: 30, height: 15 });
+      
+      level.ceilingTraps.push({ x: 200, y: 65, width: 40, height: 15 });
+      level.ceilingTraps.push({ x: 350, y: 65, width: 40, height: 15 });
+      level.ceilingTraps.push({ x: 500, y: 65, width: 40, height: 15 });
+      
+      level.invisibleHazards.push({ x: 300, y: 355, width: 40, height: 15, visible: false });
+      level.invisibleHazards.push({ x: 500, y: 355, width: 40, height: 15, visible: false });
+      
+      level.enemies.push({ x: 200, y: 340, width: 30, height: 30, vx: 3, minX: 150, maxX: 300 });
+      level.enemies.push({ x: 400, y: 340, width: 30, height: 30, vx: -3, minX: 350, maxX: 500 });
+      level.enemies.push({ x: 600, y: 340, width: 30, height: 30, vx: 3, minX: 550, maxX: 700 });
+      
+      level.fakeExits.push({ x: 100, y: 310, width: 40, height: 60 });
+      level.fakeExits.push({ x: 300, y: 80, width: 40, height: 60 });
+      level.fakeExits.push({ x: 500, y: 310, width: 40, height: 60 });
+      level.fakeExits.push({ x: 200, y: 180, width: 40, height: 60 });
+      level.exits.push({ x: 720, y: 240, width: 40, height: 60 });
+      
+      if (levelNum % 20 === 0) {
+        level.secretKeys.push({ x: 390, y: 90, collected: false });
+      }
+    }
+
+    return level;
+  };
+
+  const [level, setLevel] = useState(generateLevel(1));
+
+  useEffect(() => {
+    const newLevel = generateLevel(currentLevel);
+    setLevel(newLevel);
+    setPlayerPos(newLevel.startPos);
+    setVelocity({ x: 0, y: 0 });
+    setGravityFlipped(false);
+    setCollectedKeys([]);
+    setGameState('playing');
+  }, [currentLevel]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'r' && gameState === 'dead') {
+        const newLevel = generateLevel(currentLevel);
+        setLevel(newLevel);
+        setPlayerPos(newLevel.startPos);
+        setVelocity({ x: 0, y: 0 });
+        setGravityFlipped(false);
+        setGameState('playing');
+        return;
+      }
+
+      setKeys(prev => ({ ...prev, [e.key]: true }));
+      
+      if ((e.key === ' ' || e.key === 'w' || e.key === 'ArrowUp') && gameState === 'playing') {
+        const onGround = !gravityFlipped ? 
+          playerPos.y >= 340 || level.platforms.some(p => 
+            playerPos.y + PLAYER_SIZE >= p.y - 2 && 
+            playerPos.y + PLAYER_SIZE <= p.y + 5 &&
+            playerPos.x + PLAYER_SIZE > p.x &&
+            playerPos.x < p.x + p.width
+          ) :
+          playerPos.y <= 80 || level.platforms.some(p => 
+            playerPos.y <= p.y + p.height + 2 && 
+            playerPos.y >= p.y + p.height - 5 &&
+            playerPos.x + PLAYER_SIZE > p.x &&
+            playerPos.x < p.x + p.width
+          );
+        
+        if (onGround) {
+          setVelocity(prev => ({ ...prev, y: gravityFlipped ? JUMP_FORCE * -1 : JUMP_FORCE }));
+        }
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      setKeys(prev => ({ ...prev, [e.key]: false }));
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [playerPos, gravityFlipped, level, gameState, currentLevel]);
+
+  useEffect(() => {
+    if (gameState !== 'playing') return;
+
+    const gameLoop = setInterval(() => {
+      setLevel(prev => {
+        const updated = { ...prev };
+        
+        updated.movingPlatforms = prev.movingPlatforms.map(p => {
+          let newX = p.x + p.vx;
+          let newVx = p.vx;
+          if (newX <= p.minX || newX >= p.maxX) newVx *= -1;
+          return { ...p, x: newX, vx: newVx };
+        });
+        
+        updated.enemies = prev.enemies.map(e => {
+          let newX = e.x + e.vx;
+          let newVx = e.vx;
+          if (newX <= e.minX || newX >= e.maxX) newVx *= -1;
+          return { ...e, x: newX, vx: newVx };
+        });
+        
+        updated.timedPlatforms = prev.timedPlatforms.map(tp => {
+          if (playerPos.x + PLAYER_SIZE > tp.x && playerPos.x < tp.x + tp.width &&
+              Math.abs(playerPos.y + PLAYER_SIZE - tp.y) < 5) {
+            return { ...tp, timer: tp.timer + 1 };
+          }
+          return tp;
+        });
+        
+        return updated;
+      });
+
+      setPlayerPos(prev => {
+        let newX = prev.x;
+        let newY = prev.y;
+        let newVelY = velocity.y;
+
+        if (keys['ArrowLeft'] || keys['a']) newX -= MOVE_SPEED;
+        if (keys['ArrowRight'] || keys['d']) newX += MOVE_SPEED;
+
+        const currentGravity = gravityFlipped ? -GRAVITY : GRAVITY;
+        newVelY += currentGravity;
+        newY += newVelY;
+
+        const groundY = gravityFlipped ? 80 : 340;
+        if ((gravityFlipped && newY <= 80) || (!gravityFlipped && newY >= 340)) {
+          newY = groundY;
+          newVelY = 0;
+        }
+
+        level.platforms.forEach(platform => {
+          if (newX + PLAYER_SIZE > platform.x && newX < platform.x + platform.width) {
+            if (!gravityFlipped && newY + PLAYER_SIZE > platform.y && prev.y + PLAYER_SIZE <= platform.y) {
+              newY = platform.y - PLAYER_SIZE;
+              newVelY = 0;
+            } else if (gravityFlipped && newY < platform.y + platform.height && prev.y >= platform.y + platform.height) {
+              newY = platform.y + platform.height;
+              newVelY = 0;
+            }
+          }
+        });
+
+        level.movingPlatforms.forEach(platform => {
+          if (newX + PLAYER_SIZE > platform.x && newX < platform.x + platform.width) {
+            if (!gravityFlipped && newY + PLAYER_SIZE > platform.y && prev.y + PLAYER_SIZE <= platform.y) {
+              newY = platform.y - PLAYER_SIZE;
+              newVelY = 0;
+            } else if (gravityFlipped && newY < platform.y + platform.height && prev.y >= platform.y + platform.height) {
+              newY = platform.y + platform.height;
+              newVelY = 0;
+            }
+          }
+        });
+
+        level.timedPlatforms.forEach(tp => {
+          if (tp.timer < tp.maxTimer) {
+            if (newX + PLAYER_SIZE > tp.x && newX < tp.x + tp.width) {
+              if (!gravityFlipped && newY + PLAYER_SIZE > tp.y && prev.y + PLAYER_SIZE <= tp.y) {
+                newY = tp.y - PLAYER_SIZE;
+                newVelY = 0;
+              } else if (gravityFlipped && newY < tp.y + tp.height && prev.y >= tp.y + tp.height) {
+                newY = tp.y + tp.height;
+                newVelY = 0;
+              }
+            }
+          }
+        });
+
+        if (newX < 0) newX = 0;
+        if (newX > 770) newX = 770;
+
+        const checkHazard = (hazard) => {
+          return newX + PLAYER_SIZE > hazard.x &&
+                 newX < hazard.x + hazard.width &&
+                 newY + PLAYER_SIZE > hazard.y &&
+                 newY < hazard.y + hazard.height;
+        };
+
+        for (let spike of level.spikes) {
+          if (checkHazard(spike)) {
+            setGameState('dead');
+            setDeaths(d => d + 1);
+            setTotalDeaths(d => d + 1);
+            return prev;
+          }
+        }
+
+        for (let trap of level.ceilingTraps) {
+          if (checkHazard(trap)) {
+            setGameState('dead');
+            setDeaths(d => d + 1);
+            setTotalDeaths(d => d + 1);
+            return prev;
+          }
+        }
+
+        for (let hazard of level.invisibleHazards) {
+          if (checkHazard(hazard)) {
+            setGameState('dead');
+            setDeaths(d => d + 1);
+            setTotalDeaths(d => d + 1);
+            hazard.visible = true;
+            return prev;
+          }
+        }
+
+        for (let enemy of level.enemies) {
+          if (checkHazard(enemy)) {
+            setGameState('dead');
+            setDeaths(d => d + 1);
+            setTotalDeaths(d => d + 1);
+            return prev;
+          }
+        }
+
+        level.fallingFloors.forEach(floor => {
+          if (newX + PLAYER_SIZE > floor.x && newX < floor.x + floor.width &&
+              Math.abs(newY + PLAYER_SIZE - floor.y) < 5) {
+            floor.fallen = true;
+          }
+        });
+
+        for (let flip of level.gravityFlips) {
+          if (checkHazard(flip)) {
+            setGravityFlipped(g => !g);
+            break;
+          }
+        }
+
+        for (let key of level.secretKeys) {
+          if (!key.collected && checkHazard(key)) {
+            key.collected = true;
+            setCollectedKeys(k => [...k, currentLevel]);
+          }
+        }
+
+        for (let fakeExit of level.fakeExits) {
+          if (checkHazard(fakeExit)) {
+            setGameState('dead');
+            setDeaths(d => d + 1);
+            setTotalDeaths(d => d + 1);
+            return prev;
+          }
+        }
+
+        for (let exit of level.exits) {
+          if (checkHazard(exit)) {
+            setGameState('won');
+            if (!completedLevels.includes(currentLevel)) {
+              setCompletedLevels(c => [...c, currentLevel]);
+            }
+            return prev;
+          }
+        }
+
+        setVelocity({ x: 0, y: newVelY });
+        return { x: newX, y: newY };
+      });
+    }, 1000 / 60);
+
+    return () => clearInterval(gameLoop);
+  }, [keys, velocity, gameState, gravityFlipped, level, currentLevel, playerPos, completedLevels]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 800, 400);
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, 800, 400);
+
+    ctx.fillStyle = '#444';
+    level.platforms.forEach(platform => {
+      ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    });
+
+    ctx.fillStyle = '#666';
+    level.movingPlatforms.forEach(platform => {
+      ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    });
+
+    level.timedPlatforms.forEach(tp => {
+      if (tp.timer < tp.maxTimer) {
+        const opacity = 1 - (tp.timer / tp.maxTimer) * 0.7;
+        ctx.fillStyle = `rgba(150, 150, 150, ${opacity})`;
+        ctx.fillRect(tp.x, tp.y, tp.width, tp.height);
+      }
+    });
+
+    level.fallingFloors.forEach(floor => {
+      if (!floor.fallen) {
+        ctx.fillStyle = '#888';
+        ctx.fillRect(floor.x, floor.y, floor.width, floor.height);
+      }
+    });
+
+    ctx.fillStyle = '#ff0000';
+    level.spikes.forEach(spike => {
+      ctx.beginPath();
+      ctx.moveTo(spike.x, spike.y + spike.height);
+      ctx.lineTo(spike.x + spike.width / 2, spike.y);
+      ctx.lineTo(spike.x + spike.width, spike.y + spike.height);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    ctx.fillStyle = '#ff0000';
+    level.ceilingTraps.forEach(trap => {
+      ctx.beginPath();
+      ctx.moveTo(trap.x, trap.y);
+      ctx.lineTo(trap.x + trap.width / 2, trap.y + trap.height);
+      ctx.lineTo(trap.x + trap.width, trap.y);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    level.invisibleHazards.forEach(hazard => {
+      if (hazard.visible) {
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath();
+        ctx.moveTo(hazard.x, hazard.y + hazard.height);
+        ctx.lineTo(hazard.x + hazard.width / 2, hazard.y);
+        ctx.lineTo(hazard.x + hazard.width, hazard.y + hazard.height);
+        ctx.closePath();
+        ctx.fill();
+      }
+    });
+
+    ctx.fillStyle = '#ff4444';
+    level.enemies.forEach(enemy => {
+      ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+    });
+
+    ctx.fillStyle = '#9966ff';
+    level.gravityFlips.forEach(flip => {
+      ctx.fillRect(flip.x, flip.y, flip.width, flip.height);
+      ctx.fillStyle = '#fff';
+      ctx.font = '20px Arial';
+      ctx.fillText('G', flip.x + 12, flip.y + 27);
+      ctx.fillStyle = '#9966ff';
+    });
+
+    ctx.fillStyle = '#ffdd00';
+    level.secretKeys.forEach(key => {
+      if (!key.collected) {
+        ctx.fillRect(key.x, key.y, 20, 20);
+      }
+    });
+
+    ctx.fillStyle = '#ff6600';
+    level.fakeExits.forEach(exit => {
+      ctx.fillRect(exit.x, exit.y, exit.width, exit.height);
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px Arial';
+      ctx.fillText('EXIT', exit.x + 4, exit.y + 30);
+      ctx.fillStyle = '#ff6600';
+    });
+
+    ctx.fillStyle = '#00ff00';
+    level.exits.forEach(exit => {
+      ctx.fillRect(exit.x, exit.y, exit.width, exit.height);
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px Arial';
+      ctx.fillText('EXIT', exit.x + 4, exit.y + 30);
+      ctx.fillStyle = '#00ff00';
+    });
+
+    if (gameState === 'playing') {
+      ctx.fillStyle = gravityFlipped ? '#00ccff' : '#ffcc00';
+      ctx.fillRect(playerPos.x, playerPos.y, PLAYER_SIZE, PLAYER_SIZE);
+      
+      ctx.fillStyle = '#000';
+      ctx.fillRect(playerPos.x + 8, playerPos.y + 10, 5, 5);
+      ctx.fillRect(playerPos.x + 17, playerPos.y + 10, 5, 5);
+      ctx.fillRect(playerPos.x + 8, playerPos.y + 20, 14, 3);
+    }
+
+  }, [playerPos, gameState, level, gravityFlipped]);
+
+  const nextLevel = () => {
+    if (currentLevel < 200) {
+      setCurrentLevel(c => c + 1);
+      setDeaths(0);
+    }
+  };
+
+  const previousLevel = () => {
+    if (currentLevel > 1) {
+      setCurrentLevel(c => c - 1);
+      setDeaths(0);
+    }
+  };
+
+  const resetLevel = () => {
+    const newLevel = generateLevel(currentLevel);
+    setLevel(newLevel);
+    setPlayerPos(newLevel.startPos);
+    setVelocity({ x: 0, y: 0 });
+    setGravityFlipped(false);
+    setGameState('playing');
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-4">
+      <div className="mb-4 text-white text-center">
+        <h1 className="text-3xl font-bold mb-2">Level Devil</h1>
+        <div className="flex gap-4 justify-center items-center text-sm">
+          <span>Level: {currentLevel}/200</span>
+          <span>Deaths: {deaths}</span>
+          <span>Total Deaths: {totalDeaths}</span>
+          <span>Completed: {completedLevels.length}/200</span>
+        </div>
+        {collectedKeys.length > 0 && (
+          <div className="flex items-center gap-2 justify-center mt-2">
+            <Key size={16} className="text-yellow-400" />
+            <span className="text-sm">Keys: {collectedKeys.length}</span>
+          </div>
+        )}
+      </div>
+
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={400}
+        className="border-4 border-gray-700 rounded-lg"
+      />
+
+      <div className="mt-4 text-white text-center space-y-2">
+        <div className="flex gap-4 justify-center text-sm">
+          <span>⬅️ A/← : Left</span>
+          <span>➡️ D/→ : Right</span>
+          <span>⬆️ W/Space/↑ : Jump</span>
+          <span>R : Reset</span>
+        </div>
+
+        {gravityFlipped && (
+          <div className="text-purple-400 text-sm">⚠️ GRAVITY FLIPPED!</div>
+        )}
+
+        <div className="flex gap-2 justify-center mt-4">
+          <button
+            onClick={previousLevel}
+            disabled={currentLevel === 1}
+            className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 px-4 py-2 rounded font-bold"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={resetLevel}
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold"
+          >
+            Reset Level
+          </button>
+          <button
+            onClick={nextLevel}
+            disabled={currentLevel === 200}
+            className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 px-4 py-2 rounded font-bold"
+          >
+            Next →
+          </button>
+        </div>
+
+        {gameState === 'dead' && (
+          <div className="bg-red-900 p-4 rounded-lg mt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <AlertCircle className="text-red-400" />
+              <span className="text-xl font-bold">YOU DIED!</span>
+            </div>
+            <p className="text-sm mb-2">Press R or click to try again</p>
+            <button
+              onClick={resetLevel}
+              className="bg-red-600 hover:bg-red-700 px-6 py-2 rounded font-bold"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {gameState === 'won' && (
+          <div className="bg-green-900 p-4 rounded-lg mt-4">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Trophy className="text-yellow-400" />
+              <span className="text-xl font-bold">LEVEL COMPLETE!</span>
+            </div>
+            <p className="text-sm text-gray-300">Deaths: {deaths}</p>
+            <div className="flex gap-2 justify-center mt-2">
+              <button
+                onClick={resetLevel}
+                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded font-bold"
+              >
+                Replay
+              </button>
+              {currentLevel < 200 && (
+                <button
+                  onClick={nextLevel}
+                  className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold"
+                >
+                  Next Level →
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {currentLevel === 200 && completedLevels.length === 200 && (
+          <div className="bg-purple-900 p-4 rounded-lg mt-4">
+            <Trophy className="text-yellow-400 mx-auto mb-2" size={48} />
+            <div className="text-2xl font-bold">🎉 GAME COMPLETE! 🎉</div>
+            <p className="text-sm mt-2">You've beaten all 200 levels!</p>
+            <p className="text-sm">Total Deaths: {totalDeaths}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default LevelDevil;
