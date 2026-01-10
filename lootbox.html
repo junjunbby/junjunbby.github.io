@@ -560,44 +560,33 @@
             playSound('open');
 
             setTimeout(() => {
-                const items = [];
-                const rarityCounts = { uncommon: 3, rare: 2, epic: 2, legendary: 2, secret: 1 };
+                const rarity = getRarity(box.weights);
+                const item = generateItem(rarity, box.isEvent);
                 
-                for (const [rarity, count] of Object.entries(rarityCounts)) {
-                    for (let i = 0; i < count; i++) {
-                        const item = generateItem(rarity, box.isEvent);
-                        items.push(item);
-                        gameState.inventory.push(item);
-                        
-                        if (rarity === 'legendary') gameState.legendaryCount++;
-                        if (rarity === 'secret') gameState.secretCount++;
-                    }
-                }
+                gameState.inventory.push(item);
+                
+                if (rarity === 'legendary') gameState.legendaryCount++;
+                if (rarity === 'secret') gameState.secretCount++;
 
                 animation.innerHTML = '<div class="items-reveal"></div>';
                 const reveal = animation.querySelector('.items-reveal');
                 
-                items.forEach((item, index) => {
+                const itemEl = createItemElement(item, true);
+                reveal.appendChild(itemEl);
+                
+                if (item.rarity === 'secret') {
                     setTimeout(() => {
-                        const itemEl = createItemElement(item, true);
-                        itemEl.style.animationDelay = `${index * 0.1}s`;
-                        reveal.appendChild(itemEl);
-                        
-                        if (item.rarity === 'secret') {
-                            setTimeout(() => {
-                                itemEl.classList.add('flash-effect');
-                                createConfetti(itemEl);
-                                playSound('secret');
-                            }, index * 100 + 500);
-                        }
-                    }, index * 200);
-                });
+                        itemEl.classList.add('flash-effect');
+                        createConfetti(itemEl);
+                        playSound('secret');
+                    }, 500);
+                }
 
                 setTimeout(() => {
                     overlay.classList.remove('active');
                     animation.style.display = 'none';
                     updateUI();
-                }, items.length * 200 + 2000);
+                }, 2000);
             }, 1000);
         }
 
