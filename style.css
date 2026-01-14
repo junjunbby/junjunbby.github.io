@@ -292,26 +292,32 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
   cursor:pointer;
 }
 
-/* Banner grid buttons: neutral base */
-.banner-grid button {
-  padding: 8px;
-  height: 48px;
-  border-radius: 8px;
-  background: transparent;
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.06);
-  cursor: pointer;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
+/* Banner grid (swatch previews) */
+.banner-grid{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:8px;
+  max-height:220px;
+  overflow:auto;
+  padding-right:6px;
+}
+.banner-grid button{
+  padding:8px;
+  height:48px;
+  border-radius:8px;
+  background:transparent;
+  color:#fff;
+  border:1px solid rgba(255,255,255,0.06);
+  cursor:pointer;
+  font-size:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  position:relative;
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
-
-/* Remove white text bleed and keep label subtle */
-.banner-grid button::after {
+.banner-grid button::after{
   content: attr(data-banner);
   position: absolute;
   inset: 0;
@@ -324,12 +330,10 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
   pointer-events: none;
   text-shadow: 0 1px 0 rgba(0,0,0,0.35);
 }
-
-/* Hover / active */
 .banner-grid button:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(2,6,23,0.45); }
 .banner-grid button.active { outline: none; border-color: rgba(124,92,255,0.9); box-shadow: 0 10px 30px rgba(124,92,255,0.12); transform: translateY(-2px); }
 
-/* Per-banner swatches (flat, crisp previews) */
+/* Per-banner swatches */
 .banner-grid button[data-banner="blueFade"]     { background: linear-gradient(90deg,#0b2b4a,#003b6b); }
 .banner-grid button[data-banner="purpleFade"]   { background: linear-gradient(90deg,#2b0b4a,#5b2b9a); }
 .banner-grid button[data-banner="sunset"]       { background: linear-gradient(90deg,#3b0b0b,#7a2b1a); }
@@ -348,11 +352,6 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
 .banner-grid button[data-banner="techLines"]    { background: linear-gradient(90deg,#071018,#0b1a2b); }
 .banner-grid button[data-banner="pixelGrid"]    { background: linear-gradient(90deg,#0b0f12,#0f1720); }
 .banner-grid button[data-banner="neonMesh"]     { background: linear-gradient(90deg,#1a002b,#003b6b); }
-
-/* Make scrollbars subtle */
-.banner-grid::-webkit-scrollbar { height:8px; width:8px; }
-.banner-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius:8px; }
-
 
 /* Settings actions */
 .settings-actions{
@@ -395,11 +394,169 @@ body[data-theme="matrix"]{--bg:#001a00; --accent:#00ff41}
 body[data-theme="cyberpunk"]{--bg:#1a0015; --accent:#ff2ec4}
 body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
 
-/* Small screens */
-@media (max-width:720px){
-  .theme-grid{grid-template-columns:repeat(3,1fr)}
-  .banner-grid{grid-template-columns:repeat(3,1fr)}
-  .profile{padding:28px 18px}
-  .wrap{padding-bottom:40px}
+/* Chaos button wrapper - right middle */
+.chaos-wrapper{
+  position:fixed;
+  top:50%;
+  right:20px;
+  transform:translateY(-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  z-index:2000;
 }
 
+/* Minimal black chaos button */
+.chaos-btn{
+  width:54px;
+  height:54px;
+  border-radius:18px;
+  background:#050608;
+  border:1px solid rgba(255,255,255,0.12);
+  color:#f5f5f5;
+  font-size:12px;
+  letter-spacing:0.08em;
+  font-weight:700;
+  cursor:pointer;
+  box-shadow:0 10px 30px rgba(0,0,0,0.6);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-transform:uppercase;
+  transition:transform 140ms ease, box-shadow 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.chaos-btn:hover:not(.cooldown){
+  transform:translateY(-2px);
+  box-shadow:0 14px 40px rgba(0,0,0,0.8);
+}
+
+.chaos-btn:active:not(.cooldown){
+  transform:translateY(1px) scale(0.97);
+  box-shadow:0 8px 20px rgba(0,0,0,0.7);
+}
+
+/* Super Chaos visual state */
+.chaos-btn.super{
+  background:#111;
+  color:#ff4b81;
+  border-color:#ff4b81;
+  text-shadow:0 0 8px rgba(255,75,129,0.6);
+}
+
+/* Cooldown ring using ::after */
+.chaos-btn.cooldown{
+  position:relative;
+  pointer-events:none;
+  opacity:0.8;
+}
+
+.chaos-btn.cooldown::after{
+  content:"";
+  position:absolute;
+  inset:-4px;
+  border-radius:inherit;
+  border:2px solid rgba(255,255,255,0.3);
+  box-sizing:border-box;
+  animation:chaosCooldown 900ms linear forwards;
+}
+
+@keyframes chaosCooldown{
+  0%{transform:scale(1); opacity:1;}
+  100%{transform:scale(0.7); opacity:0;}
+}
+
+/* Chaos counter text */
+.chaos-counter{
+  font-size:11px;
+  color:var(--muted,#9aa4b2);
+  background:rgba(0,0,0,0.35);
+  padding:4px 9px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.08);
+  backdrop-filter:blur(10px);
+}
+
+/* Shake for super chaos */
+@keyframes chaosShakeHard{
+  0%{transform:translate(-2px,-2px);}
+  20%{transform:translate(4px,2px);}
+  40%{transform:translate(-4px,3px);}
+  60%{transform:translate(5px,-3px);}
+  80%{transform:translate(-3px,2px);}
+  100%{transform:translate(0,0);}
+}
+
+.super-shake{
+  animation:chaosShakeHard 500ms ease;
+}
+
+/* Emoji rain */
+.chaos-emoji{
+  position:fixed;
+  top:-30px;
+  font-size:32px;
+  animation:chaosFall 1.6s linear forwards;
+  pointer-events:none;
+  z-index:3000;
+}
+
+@keyframes chaosFall{
+  to{
+    transform:translateY(120vh) rotate(540deg);
+    opacity:0;
+  }
+}
+
+/* Glitch effect */
+.chaos-glitch{
+  animation:chaosGlitchAnim 450ms steps(2,end);
+}
+
+@keyframes chaosGlitchAnim{
+  0%{ text-shadow:2px 0 #ff004c, -2px 0 #00f6ff; }
+  50%{ text-shadow:-2px 0 #ff004c, 2px 0 #00f6ff; }
+  100%{ text-shadow:0 0 transparent; }
+}
+
+/* Quick flash overlay */
+.chaos-flash{
+  position:fixed;
+  inset:0;
+  background:radial-gradient(circle at center,rgba(255,255,255,0.4),transparent 60%);
+  pointer-events:none;
+  z-index:2900;
+  animation:chaosFlashAnim 260ms ease-out forwards;
+}
+
+@keyframes chaosFlashAnim{
+  from{opacity:0.8;}
+  to{opacity:0;}
+}
+
+/* Blur pulse */
+.chaos-blur{
+  filter:blur(4px);
+  transition:filter 220ms ease;
+}
+
+/* Wiggle text */
+@keyframes chaosWiggle{
+  0%{ transform:translateY(0); }
+  25%{ transform:translateY(-2px) rotate(-1deg); }
+  50%{ transform:translateY(2px) rotate(1deg); }
+  75%{ transform:translateY(-1px) rotate(-1deg); }
+  100%{ transform:translateY(0) rotate(0); }
+}
+
+.chaos-wiggle{
+  animation:chaosWiggle 380ms ease-in-out;
+}
+
+/* Small screens - move chaos button slightly in */
+@media (max-width:720px){
+  .chaos-wrapper{
+    right:12px;
+  }
+}
