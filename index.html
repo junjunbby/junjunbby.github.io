@@ -52,9 +52,10 @@
       <!-- Meta centered -->
       <div class="meta">
         <div class="name">JunJun</div>
-        <div class="handle">@junjun0558</div>
+        <div class="handle">@dev</div>
         <div class="role">Full‑Stack Developer • Game Jam Enthusiast</div>
         <p class="bio">I build clean, performant web experiences and small browser games.</p>
+        <div class="visitor-stats" id="visitorStats">Visitors: —</div>
       </div>
     </header>
 
@@ -117,11 +118,37 @@
         </div>
       </div>
 
+      <hr>
+
+      <div class="settings-section">
+        <h3 class="section-title">Chaos Clicker</h3>
+        <label class="toggle-row">
+          <input type="checkbox" id="disableChaosToggle">
+          <span>Disable Chaos Clicker</span>
+        </label>
+        <div style="height:8px"></div>
+        <button id="resetChaosBtn" class="reset-chaos">Reset Chaos Count</button>
+      </div>
+
       <div class="settings-actions">
         <button class="close-btn" id="closeSettings">Close</button>
-        <button class="reset-btn" id="resetSettings">Reset</button>
+        <button class="reset-btn" id="resetSettings">Reset Appearance</button>
       </div>
     </div>
+  </div>
+
+  <!-- Achievements Panel -->
+  <div id="achievementsPanel" class="achievements-panel" aria-hidden="true" role="dialog" aria-label="Achievements">
+    <div class="achievements-header">
+      <strong>Achievements</strong>
+      <button id="closeAchievements" class="close-small" aria-label="Close achievements">✕</button>
+    </div>
+    <div class="achievements-list" id="achievementsList" role="list"></div>
+  </div>
+
+  <!-- Floating Achievements Button -->
+  <div class="achieve-wrapper" aria-hidden="false">
+    <button id="openAchievements" class="achieve-btn" aria-label="Open achievements">🏆</button>
   </div>
 
   <!-- Chaos Clicker (floating right middle) -->
@@ -222,7 +249,6 @@
       openSettings.addEventListener('click', () => {
         settingsModal.style.display = 'flex';
         settingsModal.setAttribute('aria-hidden', 'false');
-        // focus trap start
         const focusable = settingsModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
         if(focusable.length) focusable[0].focus();
       });
@@ -259,169 +285,166 @@
     })();
   </script>
 
-  <!-- Chaos Clicker System Script -->
+  <!-- Chaos Clicker + Achievements + Visitor Stats Script -->
   <script>
   (function(){
+    /* Elements */
     const chaosBtn = document.getElementById('chaosBtn');
     const chaosCounterEl = document.getElementById('chaosCounter');
-    const profileBanner = document.getElementById('profileBanner');
-    const avatar = document.querySelector('.avatar');
-    const nameEl = document.querySelector('.name');
-    const body = document.body;
-    const wrap = document.querySelector('.wrap');
-    const profileCard = document.querySelector('.profile');
+    const disableToggle = document.getElementById('disableChaosToggle');
+    const resetChaosBtn = document.getElementById('resetChaosBtn');
+    const achievementsPanel = document.getElementById('achievementsPanel');
+    const achievementsList = document.getElementById('achievementsList');
+    const openAchievements = document.getElementById('openAchievements');
+    const closeAchievements = document.getElementById('closeAchievements');
+    const visitorStatsEl = document.getElementById('visitorStats');
 
-    const themeOptions = ["light","dark","purple","neonBlue","galaxy","galaxyPurple","sunset","matrix","cyberpunk","midnight"];
-    const bannerOptions = ["blueFade","purpleFade","sunset","neonBlue","galaxy","galaxyPurple","midnight","matrix","cyberpunk","iceBlue","lava","emerald","gold","vaporwave","fortniteOG","techLines","pixelGrid","neonMesh"];
-
-    let chaosCount = 0;
-    const superThreshold = 10;
-    const cooldownMs = 900;
-    let onCooldown = false;
-
-    /* Sound system using WebAudio */
-    function playChaosSound(type){
-      try{
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.connect(g);
-        g.connect(ctx.destination);
-        const now = ctx.currentTime;
-
-        if(type === 'zap'){
-          o.type = 'square';
-          o.frequency.setValueAtTime(900, now);
-          o.frequency.exponentialRampToValueAtTime(140, now + 0.18);
-          g.gain.setValueAtTime(0.18, now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.20);
-          o.start(now);
-          o.stop(now + 0.22);
-        } else if(type === 'boom'){
-          o.type = 'sawtooth';
-          o.frequency.setValueAtTime(120, now);
-          o.frequency.exponentialRampToValueAtTime(30, now + 0.25);
-          g.gain.setValueAtTime(0.28, now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-          o.start(now);
-          o.stop(now + 0.32);
-        } else if(type === 'blip'){
-          o.type = 'triangle';
-          o.frequency.setValueAtTime(420, now);
-          g.gain.setValueAtTime(0.14, now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
-          o.start(now);
-          o.stop(now + 0.17);
-        } else if(type === 'bass'){
-          o.type = 'sine';
-          o.frequency.setValueAtTime(60, now);
-          g.gain.setValueAtTime(0.35, now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
-          o.start(now);
-          o.stop(now + 0.5);
-        } else {
-          o.type = 'square';
-          o.frequency.setValueAtTime(520, now);
-          g.gain.setValueAtTime(0.1, now);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-          o.start(now);
-          o.stop(now + 0.14);
-        }
-      }catch(e){
-        // ignore audio errors (autoplay restrictions)
-      }
-    }
-
-    /* Helpers */
-    function randomFrom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
-    function quickClassPulse(el, cls, ms){ if(!el) return; el.classList.add(cls); setTimeout(()=>el.classList.remove(cls), ms); }
-    function addFlash(){ const f = document.createElement('div'); f.className = 'chaos-flash'; document.body.appendChild(f); setTimeout(()=>f.remove(), 260); }
-    function spawnEmoji(count, intense){
-      for(let i=0;i<count;i++){
-        const e = document.createElement('div');
-        e.className = 'chaos-emoji';
-        e.textContent = randomFrom(intense ? ["💥","🔥","💀","😈","⚡","🧨"] : ["✨","⚡","🎉","🌀","⭐"]);
-        e.style.left = Math.random()*100 + 'vw';
-        e.style.fontSize = intense ? (26 + Math.random()*16) + 'px' : (22 + Math.random()*10) + 'px';
-        document.body.appendChild(e);
-        setTimeout(()=>e.remove(), 1700);
-      }
-    }
-
-    /* Chaos effects (20+) */
-    const chaosEffects = [
-      () => { const t = randomFrom(themeOptions); body.setAttribute('data-theme', t); playChaosSound('blip'); },
-      () => { const b = randomFrom(bannerOptions); profileBanner.className = 'profile-banner banner-' + b; playChaosSound('blip'); },
-      () => { spawnEmoji(16,false); playChaosSound('zap'); },
-      () => { if(wrap){ quickClassPulse(wrap,'super-shake',500); playChaosSound('boom'); } },
-      () => { if(avatar){ avatar.style.transition = 'transform 520ms ease'; avatar.style.transform = 'rotate(720deg) scale(1.05)'; setTimeout(()=>avatar.style.transform='',540); } playChaosSound('blip'); },
-      () => { quickClassPulse(nameEl,'chaos-glitch',450); playChaosSound('zap'); },
-      () => { body.style.transition = 'background 280ms ease'; body.style.background = `hsl(${Math.floor(Math.random()*360)}, 60%, 8%)`; playChaosSound('blip'); },
-      () => { quickClassPulse(profileCard,'chaos-blur',220); playChaosSound('zap'); },
-      () => { const labels = document.querySelectorAll('.textbar .label'); if(labels.length) quickClassPulse(randomFrom(Array.from(labels)),'chaos-wiggle',380); playChaosSound('blip'); },
-      () => { addFlash(); playChaosSound('boom'); },
-      () => { body.style.transition = 'transform 220ms ease'; body.style.transform = 'rotate(' + (Math.random() > 0.5 ? 2 : -2) + 'deg)'; setTimeout(()=>body.style.transform='',260); playChaosSound('blip'); },
-      () => { chaosBtn.textContent = randomFrom(["Chaos Clicker","MORE","AGAIN","WHY","HELP","OKAY"]); setTimeout(()=>chaosBtn.textContent='Chaos Clicker', 800); playChaosSound('blip'); },
-      () => { if(profileBanner){ profileBanner.style.transition = 'transform 260ms ease'; profileBanner.style.transform = 'translateX(110%)'; setTimeout(()=>{ profileBanner.style.transform = 'translateX(0)'; },260); setTimeout(()=>{ profileBanner.style.transition=''; },620); } playChaosSound('zap'); },
-      () => { body.style.filter = 'invert(1) hue-rotate(180deg)'; setTimeout(()=>body.style.filter='',280); playChaosSound('zap'); },
-      () => { const bars = document.querySelectorAll('.textbar'); if(bars.length){ const target = randomFrom(Array.from(bars)); const oldBg = getComputedStyle(target).background; target.style.transition = 'background 220ms ease'; target.style.background = 'rgba(255,255,255,0.10)'; setTimeout(()=>target.style.background = oldBg,260); } playChaosSound('blip'); },
-      () => { if(avatar){ avatar.style.transition = 'transform 220ms ease'; avatar.style.transform = 'scale(1.35)'; setTimeout(()=>avatar.style.transform='scale(1)',240); setTimeout(()=>avatar.style.transform='',480); } playChaosSound('boom'); },
-      () => { for(let i=0;i<10;i++){ const dot = document.createElement('div'); dot.style.position='fixed'; const rect = chaosBtn.getBoundingClientRect(); dot.style.left = (rect.left + rect.width/2) + 'px'; dot.style.top = (rect.top + rect.height/2) + 'px'; dot.style.width=dot.style.height='6px'; dot.style.borderRadius='50%'; dot.style.background=randomFrom(['#111','#4cc9f0','#ff4b81']); dot.style.pointerEvents='none'; dot.style.zIndex='2500'; const angle = Math.random()*Math.PI*2; const dist = 50 + Math.random()*40; dot.style.transition='transform 420ms ease-out, opacity 420ms ease-out'; document.body.appendChild(dot); requestAnimationFrame(()=>{ dot.style.transform=`translate(${Math.cos(angle)*dist}px,${Math.sin(angle)*dist}px)`; dot.style.opacity='0'; }); setTimeout(()=>dot.remove(),460); } playChaosSound('zap'); },
-      () => { spawnEmoji(26,true); playChaosSound('boom'); },
-      () => { if(nameEl){ const oldSize = getComputedStyle(nameEl).fontSize; nameEl.style.transition='font-size 120ms ease'; nameEl.style.fontSize='24px'; setTimeout(()=>nameEl.style.fontSize=oldSize,220); setTimeout(()=>nameEl.style.transition='',420); } playChaosSound('blip'); },
-      () => { const note = document.createElement('div'); note.textContent = randomFrom(["Chaos rising...","You like this too much","Unstable theme detected","System overheating"]); note.style.position='fixed'; note.style.bottom='20px'; note.style.left='50%'; note.style.transform='translateX(-50%)'; note.style.background='rgba(5,5,8,0.9)'; note.style.border='1px solid rgba(255,255,255,0.15)'; note.style.color='#fff'; note.style.fontSize='12px'; note.style.padding='6px 12px'; note.style.borderRadius='999px'; note.style.zIndex='2600'; note.style.opacity='0'; note.style.transition='opacity 180ms ease, transform 180ms ease'; document.body.appendChild(note); requestAnimationFrame(()=>{ note.style.opacity='1'; note.style.transform='translate(-50%, -8px)'; }); setTimeout(()=>{ note.style.opacity='0'; note.style.transform='translate(-50%, 0)'; setTimeout(()=>note.remove(),180); },1200); playChaosSound('blip'); }
+    /* Config */
+    const ACHIEVEMENTS = [
+      { id: 'ach10', label: 'Novice Chaos', threshold: 10, icon: '🔰' },
+      { id: 'ach25', label: 'Rising Chaos', threshold: 25, icon: '🔥' },
+      { id: 'ach50', label: 'Chaos Veteran', threshold: 50, icon: '💥' },
+      { id: 'ach100', label: 'Chaos Master', threshold: 100, icon: '🏆' }
     ];
 
-    /* Super Chaos Mode */
-    function superChaos(){
-      chaosBtn.classList.add('super');
-      quickClassPulse(wrap,'super-shake',520);
-      addFlash();
-      spawnEmoji(40,true);
-      playChaosSound('bass');
+    const KEY_CHAOS = 'chaos_clicker_count';
+    const KEY_ACHIEVEMENTS = 'chaos_achievements_unlocked';
+    const KEY_VISITOR_LOCAL = 'site_visitors_local';
 
-      for(let i=0;i<5;i++){
-        setTimeout(()=>{ randomFrom(chaosEffects)(); }, i*90);
-      }
+    /* State */
+    let chaosCount = parseInt(localStorage.getItem(KEY_CHAOS) || '0', 10);
+    let unlocked = JSON.parse(localStorage.getItem(KEY_ACHIEVEMENTS) || '[]');
+    let localVisitorCount = parseInt(localStorage.getItem(KEY_VISITOR_LOCAL) || '0', 10);
 
-      if(profileBanner){
-        profileBanner.style.transition='filter 220ms ease';
-        profileBanner.style.filter='contrast(1.5) saturate(1.3)';
-        setTimeout(()=>profileBanner.style.filter='',260);
-        setTimeout(()=>profileBanner.style.transition='',520);
-      }
+    /* Utilities */
+    function randomFrom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-      setTimeout(()=>chaosBtn.classList.remove('super'),900);
+    /* Achievements UI */
+    function renderAchievements(){
+      achievementsList.innerHTML = '';
+      ACHIEVEMENTS.forEach(a => {
+        const el = document.createElement('div');
+        el.className = 'achievement-badge' + (unlocked.includes(a.id) ? ' unlocked' : '');
+        el.setAttribute('data-id', a.id);
+        el.innerHTML = `<div style="font-size:20px">${a.icon}</div><div style="font-size:11px;margin-top:6px">${a.label}</div>`;
+        achievementsList.appendChild(el);
+      });
     }
 
-    /* Counter update */
-    function updateChaosCounter(){ chaosCounterEl.textContent = 'Chaos Clicker: ' + chaosCount; }
+    function showToast(text){
+      const t = document.createElement('div');
+      t.className = 'achievement-toast';
+      t.textContent = text;
+      document.body.appendChild(t);
+      requestAnimationFrame(()=> t.classList.add('show'));
+      setTimeout(()=> { t.classList.remove('show'); setTimeout(()=> t.remove(), 260); }, 1600);
+    }
 
-    /* Cooldown + click handler */
-    chaosBtn.addEventListener('click', () => {
-      if(onCooldown) return;
-      onCooldown = true;
-      chaosBtn.classList.add('cooldown');
+    function unlockAchievement(id){
+      if(unlocked.includes(id)) return;
+      unlocked.push(id);
+      localStorage.setItem(KEY_ACHIEVEMENTS, JSON.stringify(unlocked));
+      renderAchievements();
+      const ach = ACHIEVEMENTS.find(x => x.id === id);
+      showToast(`Unlocked: ${ach.label} ${ach.icon}`);
+    }
 
-      chaosCount++;
-      updateChaosCounter();
+    function checkAchievements(){
+      ACHIEVEMENTS.forEach(a => {
+        if(chaosCount >= a.threshold) unlockAchievement(a.id);
+      });
+    }
 
-      if(chaosCount % superThreshold === 0){
-        superChaos();
-      } else {
-        randomFrom(chaosEffects)();
+    function updateChaosUI(){
+      chaosCounterEl.textContent = 'Chaos Clicker: ' + chaosCount;
+    }
+
+    function resetChaos(){
+      chaosCount = 0;
+      localStorage.setItem(KEY_CHAOS, String(chaosCount));
+      updateChaosUI();
+    }
+
+    /* Settings controls */
+    if(disableToggle){
+      disableToggle.checked = !!localStorage.getItem('chaos_disabled');
+      disableToggle.addEventListener('change', () => {
+        if(disableToggle.checked) localStorage.setItem('chaos_disabled', '1');
+        else localStorage.removeItem('chaos_disabled');
+      });
+    }
+
+    if(resetChaosBtn){
+      resetChaosBtn.addEventListener('click', () => {
+        resetChaos();
+        unlocked = [];
+        localStorage.removeItem(KEY_ACHIEVEMENTS);
+        renderAchievements();
+        showToast('Chaos reset');
+      });
+    }
+
+    if(openAchievements){
+      openAchievements.addEventListener('click', () => {
+        achievementsPanel.style.display = 'flex';
+        achievementsPanel.setAttribute('aria-hidden', 'false');
+      });
+    }
+    if(closeAchievements){
+      closeAchievements.addEventListener('click', () => {
+        achievementsPanel.style.display = 'none';
+        achievementsPanel.setAttribute('aria-hidden', 'true');
+      });
+    }
+
+    /* Hook into Chaos Clicker */
+    if(chaosBtn){
+      chaosBtn.addEventListener('click', () => {
+        if(localStorage.getItem('chaos_disabled')) return;
+        chaosCount++;
+        localStorage.setItem(KEY_CHAOS, String(chaosCount));
+        updateChaosUI();
+        checkAchievements();
+      });
+    }
+
+    /* Visitor stats: optimistic local increment + optional server POST /api/visit */
+    async function incrementVisitorCount(){
+      localVisitorCount++;
+      localStorage.setItem(KEY_VISITOR_LOCAL, String(localVisitorCount));
+      renderVisitorCount();
+
+      try{
+        const resp = await fetch('/api/visit', { method: 'POST' });
+        if(resp.ok){
+          const data = await resp.json();
+          if(data && typeof data.visitors === 'number'){
+            visitorStatsEl.textContent = 'Visitors: ' + data.visitors;
+            return;
+          }
+        }
+      }catch(e){
+        // ignore network errors, keep local fallback
       }
+    }
 
-      // cooldown visual + sound
-      playChaosSound('blip');
-      setTimeout(()=>{
-        chaosBtn.classList.remove('cooldown');
-        onCooldown = false;
-      }, cooldownMs);
-    });
+    function renderVisitorCount(){
+      visitorStatsEl.textContent = 'Visitors: ' + localVisitorCount;
+    }
 
-    // Initialize
-    updateChaosCounter();
+    /* Init */
+    renderAchievements();
+    updateChaosUI();
+    renderVisitorCount();
+    checkAchievements();
+    incrementVisitorCount();
+
+    /* Expose small API */
+    window.__ChaosPrototype = {
+      getChaosCount: () => chaosCount,
+      getUnlocked: () => unlocked.slice(),
+      resetChaos
+    };
   })();
   </script>
 
