@@ -213,6 +213,19 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
   max-width:640px;
 }
 
+/* Visitor stats (small pill) */
+.visitor-stats{
+  font-size:12px;
+  color:var(--muted);
+  background:rgba(255,255,255,0.02);
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.04);
+  backdrop-filter:blur(6px);
+  display:inline-block;
+  margin-top:8px;
+}
+
 /* Textbars */
 .textbar{
   border-radius:12px;
@@ -556,10 +569,129 @@ body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
   animation:chaosWiggle 380ms ease-in-out;
 }
 
+/* Achievements panel */
+.achievements-panel{
+  position:fixed;
+  right:92px; /* sits left of chaos clicker */
+  top:50%;
+  transform:translateY(-50%);
+  width:300px;
+  max-width:86vw;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius:12px;
+  padding:12px;
+  z-index:2200;
+  box-shadow:0 20px 50px rgba(0,0,0,0.6);
+  display:none;
+  flex-direction:column;
+  gap:8px;
+  color:#fff;
+  border:1px solid rgba(255,255,255,0.04);
+}
+
+.achievements-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+}
+
+.achievements-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding-top:6px;
+}
+
+.achievement-badge{
+  min-width:64px;
+  height:64px;
+  border-radius:10px;
+  background:rgba(255,255,255,0.03);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  font-size:12px;
+  color:#fff;
+  border:1px solid rgba(255,255,255,0.04);
+  transform:scale(0.96);
+  transition:transform 180ms ease, box-shadow 180ms ease;
+}
+
+.achievement-badge.unlocked{
+  background:linear-gradient(90deg,#ffb86b,#ff4b81);
+  color:#071018;
+  box-shadow:0 8px 24px rgba(255,75,129,0.12);
+  transform:scale(1.06);
+}
+
+/* Floating achievements button */
+.achieve-wrapper{
+  position:fixed;
+  top:50%;
+  right:92px; /* sits left of chaos clicker */
+  transform:translateY(-50%);
+  z-index:2100;
+}
+
+.achieve-btn{
+  padding:10px 12px;
+  border-radius:10px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
+  color:#fff;
+  cursor:pointer;
+  backdrop-filter:blur(6px);
+  box-shadow:0 10px 30px rgba(0,0,0,0.6);
+}
+
+/* Small close button */
+.close-small{
+  background:transparent;
+  border:none;
+  color:var(--muted);
+  cursor:pointer;
+  font-size:14px;
+}
+
+/* Unlock animation toast */
+.achievement-toast{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:28px;
+  background:#111;
+  color:#fff;
+  padding:10px 14px;
+  border-radius:10px;
+  z-index:3000;
+  box-shadow:0 12px 40px rgba(0,0,0,0.6);
+  opacity:0;
+  transition:opacity 220ms ease, transform 220ms ease;
+}
+.achievement-toast.show{
+  opacity:1;
+  transform:translateX(-50%) translateY(-6px);
+}
+
 /* Small screens - move chaos button slightly in and make modal full width */
 @media (max-width:720px){
   .chaos-wrapper{
     right:12px;
+  }
+  .achieve-wrapper{
+    right:12px;
+    top:auto;
+    bottom:120px;
+    transform:none;
+  }
+  .achievements-panel{
+    right:12px;
+    top:auto;
+    bottom:180px;
+    transform:none;
+    width:260px;
   }
   .settings-content{
     width:94%;
