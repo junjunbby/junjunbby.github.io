@@ -4,243 +4,94 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>JunJun — Dev Profile</title>
-
+  <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-
-  <style>
-    :root{
-      --bg:#0b0f12;
-      --card:#0f1720;
-      --muted:#9aa4b2;
-      --accent:#7c5cff;
-      --glass: rgba(255,255,255,0.03);
-      --glass-2: rgba(255,255,255,0.02);
-      --shadow: 0 6px 18px rgba(2,6,23,0.6);
-      --radius:14px;
-      --transition: 250ms cubic-bezier(.2,.9,.3,1);
-    }
-
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;
-      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-      background: linear-gradient(180deg, var(--bg) 0%, #071018 100%);
-      color:#e6eef8;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:48px 20px;
-      min-height:100vh;
-    }
-
-    .wrap{
-      width:100%;
-      max-width:980px;
-      display:flex;
-      flex-direction:column;
-      gap:28px;
-    }
-
-    .profile{
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-      border-radius:var(--radius);
-      padding:28px;
-      display:flex;
-      gap:20px;
-      align-items:center;
-      box-shadow:var(--shadow);
-      border:1px solid rgba(255,255,255,0.03);
-      transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
-    }
-
-    .profile:hover{
-      transform: translateY(-6px) scale(1.002);
-      box-shadow: 0 18px 40px rgba(2,6,23,0.75);
-      background: linear-gradient(180deg, rgba(124,92,255,0.06), rgba(255,255,255,0.01));
-    }
-
-    .avatar{
-      width:96px;
-      height:96px;
-      border-radius:50%;
-      background:linear-gradient(135deg,var(--accent),#4cc9f0);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight:700;
-      font-size:34px;
-      color:#071018;
-      flex-shrink:0;
-      transition: transform var(--transition), box-shadow var(--transition);
-      box-shadow: 0 6px 18px rgba(124,92,255,0.12);
-    }
-
-    .profile:hover .avatar{
-      transform: scale(1.08) rotate(-3deg);
-      box-shadow: 0 20px 40px rgba(124,92,255,0.18);
-    }
-
-    .meta{
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-      min-width:0;
-    }
-
-    .name{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      font-size:20px;
-      font-weight:700;
-    }
-
-    .name .handle{
-      color:var(--muted);
-      font-weight:500;
-      font-size:13px;
-    }
-
-    .role{
-      color:var(--muted);
-      font-size:13px;
-      margin-top:2px;
-    }
-
-    .bio{
-      color:#cfe6ff;
-      opacity:0.9;
-      font-size:14px;
-      margin-top:8px;
-      line-height:1.45;
-    }
-
-    .links{
-      margin-left:auto;
-      display:flex;
-      gap:10px;
-      align-items:center;
-    }
-
-    .pill{
-      background:var(--glass);
-      border-radius:999px;
-      padding:8px 12px;
-      font-size:13px;
-      color:var(--muted);
-      border:1px solid rgba(255,255,255,0.02);
-      transition: transform var(--transition), background var(--transition), color var(--transition);
-      cursor:pointer;
-      text-decoration:none;
-    }
-
-    .pill:hover{
-      transform: translateY(-4px);
-      background: linear-gradient(90deg, rgba(124,92,255,0.12), rgba(76,201,240,0.06));
-      color:#fff;
-    }
-
-    .discord-btn{
-      background: linear-gradient(90deg, #5865F2, #4752C4);
-      color:#fff !important;
-      font-weight:600;
-      box-shadow:0 8px 24px rgba(88,101,242,0.25);
-    }
-
-    .discord-btn:hover{
-      background: linear-gradient(90deg, #6C77FF, #5865F2);
-      transform: translateY(-4px);
-      box-shadow:0 14px 32px rgba(88,101,242,0.35);
-    }
-
-    .textbar{
-      border-radius:12px;
-      padding:14px 18px;
-      background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      border:1px solid rgba(255,255,255,0.03);
-      box-shadow: 0 8px 30px rgba(2,6,23,0.5);
-    }
-
-    .label{
-      color:var(--muted);
-      font-size:13px;
-    }
-
-    .link{
-      color:#fff;
-      background:linear-gradient(90deg,var(--accent),#4cc9f0);
-      padding:8px 12px;
-      border-radius:10px;
-      text-decoration:none;
-      font-weight:600;
-      font-size:14px;
-      transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
-      box-shadow: 0 8px 24px rgba(124,92,255,0.12);
-    }
-
-    .link:hover{
-      transform: translateY(-4px);
-      opacity:0.98;
-      box-shadow: 0 18px 40px rgba(124,92,255,0.18);
-    }
-
-    @media (max-width:720px){
-      .profile{flex-direction:column;align-items:flex-start;padding:20px}
-      .links{margin-left:0;width:100%;justify-content:space-between}
-      .textbar{flex-direction:column;align-items:stretch}
-    }
-  </style>
 </head>
 
 <body>
-  <div class="wrap">
 
-    <!-- Profile -->
-    <header class="profile">
-      <div class="avatar">JJ</div>
+<button class="settings-btn" onclick="openSettings()">⚙️</button>
 
-      <div class="meta">
-        <div class="name">
-          <div class="junjun">JunJun</div>
-          <div class="handle">@dev</div>
-        </div>
+<div class="wrap">
 
-        <div class="role">Full‑Stack Developer • Game Jam Enthusiast</div>
+  <header class="profile">
+    <div class="profile-banner fortnite"></div>
+    <div class="avatar">JJ</div>
 
-        <p class="bio">
-          I build clean, performant web experiences and small browser games. I focus on accessible UI, smooth interactions, and playful micro‑UX.
-        </p>
+    <div class="meta">
+      <div class="name">
+        <div class="junjun">JunJun</div>
+        <div class="handle">@dev</div>
       </div>
 
-      <div class="links">
-        <a class="pill discord-btn" href="https://discord.com/users/1300068854176809081" target="_blank">
-          Add me on Discord
-        </a>
-        <div class="pill">JavaScript</div>
-        <div class="pill">WebGL</div>
-        <div class="pill">Node</div>
-      </div>
-    </header>
+      <div class="role">Full‑Stack Developer • Game Jam Enthusiast</div>
 
-    <!-- MiniGamesHub -->
-    <div class="textbar">
-      <div class="label">Explore more fun projects and mini games</div>
-      <a class="link" href="game-website.html">MiniGamesHub</a>
+      <p class="bio">
+        I build clean, performant web experiences and small browser games.
+      </p>
     </div>
 
-    <!-- Fortnite Discord Server -->
-    <div class="textbar">
-      <div class="label">Join my OG Fortnite Discord Server</div>
-      <a class="link" href="https://discord.gg/MSweyqbrxR" target="_blank">
-        My OG Fortnite Discord Server
-      </a>
+    <div class="links">
+      <a class="pill discord-btn" href="https://discord.com/users/1300068854176809081" target="_blank">Add me on Discord</a>
+      <div class="pill">JavaScript</div>
+      <div class="pill">WebGL</div>
+      <div class="pill">Node</div>
     </div>
+  </header>
 
+  <div class="textbar">
+    <div class="label">Explore more fun projects and mini games</div>
+    <a class="link" href="game-website.html">MiniGamesHub</a>
   </div>
+
+  <div class="textbar">
+    <div class="label">Join my OG Fortnite Discord Server</div>
+    <a class="link" href="https://discord.gg/MSweyqbrxR" target="_blank">My OG Fortnite Discord Server</a>
+  </div>
+
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="settings-modal">
+  <div class="settings-content">
+    <h2>Theme Settings</h2>
+
+    <div class="theme-grid">
+      <button onclick="setTheme('light')">Light</button>
+      <button onclick="setTheme('dark')">Dark</button>
+      <button onclick="setTheme('purple')">Purple</button>
+      <button onclick="setTheme('galaxy')">Galaxy</button>
+      <button onclick="setTheme('galaxyPurple')">Galaxy Purple</button>
+      <button onclick="setTheme('neonBlue')">Neon Blue</button>
+      <button onclick="setTheme('sunset')">Sunset</button>
+      <button onclick="setTheme('matrix')">Matrix</button>
+      <button onclick="setTheme('cyberpunk')">Cyberpunk</button>
+      <button onclick="setTheme('midnight')">Midnight</button>
+    </div>
+
+    <button class="close-btn" onclick="closeSettings()">Close</button>
+  </div>
+</div>
+
+<script>
+function openSettings() {
+  document.getElementById("settingsModal").style.display = "flex";
+}
+
+function closeSettings() {
+  document.getElementById("settingsModal").style.display = "none";
+}
+
+function setTheme(theme) {
+  document.body.setAttribute("data-theme", theme);
+  localStorage.setItem("siteTheme", theme);
+}
+
+window.onload = () => {
+  const saved = localStorage.getItem("siteTheme");
+  if (saved) document.body.setAttribute("data-theme", saved);
+};
+</script>
+
 </body>
 </html>
