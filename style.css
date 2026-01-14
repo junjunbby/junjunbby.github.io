@@ -292,24 +292,67 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
   cursor:pointer;
 }
 
-/* Banner grid (15+ styles) */
-.banner-grid{
-  display:grid;
-  grid-template-columns:repeat(6,1fr);
-  gap:8px;
-  max-height:220px;
-  overflow:auto;
-  padding-right:6px;
+/* Banner grid buttons: neutral base */
+.banner-grid button {
+  padding: 8px;
+  height: 48px;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.06);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
-.banner-grid button{
-  padding:8px;
-  border-radius:8px;
-  background:rgba(255,255,255,0.03);
-  color:#fff;
-  border:none;
-  cursor:pointer;
-  font-size:12px;
+
+/* Remove white text bleed and keep label subtle */
+.banner-grid button::after {
+  content: attr(data-banner);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(255,255,255,0.9);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
 }
+
+/* Hover / active */
+.banner-grid button:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(2,6,23,0.45); }
+.banner-grid button.active { outline: none; border-color: rgba(124,92,255,0.9); box-shadow: 0 10px 30px rgba(124,92,255,0.12); transform: translateY(-2px); }
+
+/* Per-banner swatches (flat, crisp previews) */
+.banner-grid button[data-banner="blueFade"]     { background: linear-gradient(90deg,#0b2b4a,#003b6b); }
+.banner-grid button[data-banner="purpleFade"]   { background: linear-gradient(90deg,#2b0b4a,#5b2b9a); }
+.banner-grid button[data-banner="sunset"]       { background: linear-gradient(90deg,#3b0b0b,#7a2b1a); }
+.banner-grid button[data-banner="neonBlue"]     { background: linear-gradient(90deg,#001a2b,#003b6b); }
+.banner-grid button[data-banner="galaxy"]       { background: linear-gradient(90deg,#0b0f2b,#1b1f4b); }
+.banner-grid button[data-banner="galaxyPurple"] { background: linear-gradient(90deg,#1b0b2b,#4b1f6b); }
+.banner-grid button[data-banner="midnight"]     { background: linear-gradient(90deg,#020b24,#071033); }
+.banner-grid button[data-banner="matrix"]       { background: linear-gradient(90deg,#001a00,#003300); }
+.banner-grid button[data-banner="cyberpunk"]    { background: linear-gradient(90deg,#2b001a,#6b003b); }
+.banner-grid button[data-banner="iceBlue"]      { background: linear-gradient(90deg,#002b3b,#004b6b); }
+.banner-grid button[data-banner="lava"]         { background: linear-gradient(90deg,#3b0000,#6b1a00); }
+.banner-grid button[data-banner="emerald"]      { background: linear-gradient(90deg,#003b2b,#006b4b); }
+.banner-grid button[data-banner="gold"]         { background: linear-gradient(90deg,#4b3b00,#8b6b00); }
+.banner-grid button[data-banner="vaporwave"]    { background: linear-gradient(90deg,#ff7adf,#7adfff); }
+.banner-grid button[data-banner="fortniteOG"]   { background: linear-gradient(90deg,#0b3b6b,#2b6b9a); }
+.banner-grid button[data-banner="techLines"]    { background: linear-gradient(90deg,#071018,#0b1a2b); }
+.banner-grid button[data-banner="pixelGrid"]    { background: linear-gradient(90deg,#0b0f12,#0f1720); }
+.banner-grid button[data-banner="neonMesh"]     { background: linear-gradient(90deg,#1a002b,#003b6b); }
+
+/* Make scrollbars subtle */
+.banner-grid::-webkit-scrollbar { height:8px; width:8px; }
+.banner-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius:8px; }
+
 
 /* Settings actions */
 .settings-actions{
