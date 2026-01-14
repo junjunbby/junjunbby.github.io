@@ -251,7 +251,7 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
   z-index:999;
 }
 
-/* Modal */
+/* Modal (fixed size + scrollable content) */
 .settings-modal{
   display:none;
   position:fixed;
@@ -265,39 +265,43 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
 
 .settings-content{
   background:#0f1720;
-  padding:20px;
+  padding:16px;
   border-radius:12px;
-  width:720px;
-  max-width:95%;
+  width:560px;            /* reduced width to avoid oversized modal */
+  max-width:94%;
+  max-height:80vh;        /* constrain height */
+  overflow:auto;          /* allow scrolling when content is tall */
   color:#fff;
   box-shadow:0 20px 50px rgba(0,0,0,0.6);
 }
 
-.settings-section{margin-bottom:14px}
+/* Make inner sections wrap nicely on small screens */
+.settings-section{margin-bottom:12px}
 .section-title{font-size:14px;margin-bottom:8px;color:var(--muted)}
 
 /* Theme grid */
 .theme-grid{
   display:grid;
   grid-template-columns:repeat(5,1fr);
-  gap:10px;
+  gap:8px;
   margin-bottom:8px;
 }
 .theme-grid button{
-  padding:10px;
+  padding:8px;
   border-radius:8px;
   background:rgba(255,255,255,0.03);
   color:#fff;
   border:none;
   cursor:pointer;
+  font-size:13px;
 }
 
 /* Banner grid (swatch previews) */
 .banner-grid{
   display:grid;
-  grid-template-columns:repeat(6,1fr);
+  grid-template-columns:repeat(5,1fr); /* fewer columns so items fit */
   gap:8px;
-  max-height:220px;
+  max-height:200px;
   overflow:auto;
   padding-right:6px;
 }
@@ -351,7 +355,7 @@ body.loaded .wrap{animation:fadeInSite 600ms ease forwards}
 .banner-grid button[data-banner="fortniteOG"]   { background: linear-gradient(90deg,#0b3b6b,#2b6b9a); }
 .banner-grid button[data-banner="techLines"]    { background: linear-gradient(90deg,#071018,#0b1a2b); }
 .banner-grid button[data-banner="pixelGrid"]    { background: linear-gradient(90deg,#0b0f12,#0f1720); }
-.banner-grid button[data-banner="neonMesh"]     { background: linear-gradient(90deg,#1a002b,#003b6b); }
+.banner-grid button[data-banner="neonMesh"]     { background: linear-gradient(90deg,#1a002b,#003b6b)}
 
 /* Settings actions */
 .settings-actions{
@@ -394,7 +398,7 @@ body[data-theme="matrix"]{--bg:#001a00; --accent:#00ff41}
 body[data-theme="cyberpunk"]{--bg:#1a0015; --accent:#ff2ec4}
 body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
 
-/* Chaos button wrapper - right middle */
+/* Chaos Clicker button wrapper - right middle */
 .chaos-wrapper{
   position:fixed;
   top:50%;
@@ -403,28 +407,25 @@ body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
   display:flex;
   flex-direction:column;
   align-items:center;
-  gap:6px;
+  gap:8px;
   z-index:2000;
 }
 
-/* Minimal black chaos button */
+/* Chaos Clicker button - styled like other UI buttons */
 .chaos-btn{
-  width:54px;
-  height:54px;
-  border-radius:18px;
-  background:#050608;
-  border:1px solid rgba(255,255,255,0.12);
-  color:#f5f5f5;
-  font-size:12px;
-  letter-spacing:0.08em;
+  padding:10px 14px;
+  border-radius:10px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
+  color:#fff;
+  font-size:13px;
   font-weight:700;
   cursor:pointer;
+  backdrop-filter:blur(6px);
   box-shadow:0 10px 30px rgba(0,0,0,0.6);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  text-transform:uppercase;
+  text-transform:none;
   transition:transform 140ms ease, box-shadow 140ms ease, background 140ms ease, color 140ms ease;
+  white-space:nowrap;
 }
 
 .chaos-btn:hover:not(.cooldown){
@@ -433,7 +434,7 @@ body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
 }
 
 .chaos-btn:active:not(.cooldown){
-  transform:translateY(1px) scale(0.97);
+  transform:translateY(1px) scale(0.98);
   box-shadow:0 8px 20px rgba(0,0,0,0.7);
 }
 
@@ -449,15 +450,15 @@ body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
 .chaos-btn.cooldown{
   position:relative;
   pointer-events:none;
-  opacity:0.8;
+  opacity:0.85;
 }
 
 .chaos-btn.cooldown::after{
   content:"";
   position:absolute;
-  inset:-4px;
+  inset:-6px;
   border-radius:inherit;
-  border:2px solid rgba(255,255,255,0.3);
+  border:2px solid rgba(255,255,255,0.18);
   box-sizing:border-box;
   animation:chaosCooldown 900ms linear forwards;
 }
@@ -469,13 +470,13 @@ body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
 
 /* Chaos counter text */
 .chaos-counter{
-  font-size:11px;
+  font-size:12px;
   color:var(--muted,#9aa4b2);
-  background:rgba(0,0,0,0.35);
-  padding:4px 9px;
+  background:rgba(255,255,255,0.02);
+  padding:6px 10px;
   border-radius:999px;
-  border:1px solid rgba(255,255,255,0.08);
-  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,0.04);
+  backdrop-filter:blur(6px);
 }
 
 /* Shake for super chaos */
@@ -554,9 +555,15 @@ body[data-theme="midnight"]{--bg:#020b24; --accent:#4c6fff}
   animation:chaosWiggle 380ms ease-in-out;
 }
 
-/* Small screens - move chaos button slightly in */
+/* Small screens - move chaos button slightly in and make modal full width */
 @media (max-width:720px){
   .chaos-wrapper{
     right:12px;
   }
+  .settings-content{
+    width:94%;
+    padding:12px;
+  }
+  .theme-grid{ grid-template-columns:repeat(3,1fr); }
+  .banner-grid{ grid-template-columns:repeat(3,1fr); max-height:260px; }
 }
