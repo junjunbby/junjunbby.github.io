@@ -7,110 +7,240 @@
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
-
 <body>
 
-<!-- Loading Screen -->
-<div id="loader">
-  <div class="loader-circle"></div>
-  <p>Loading...</p>
-</div>
-
-<!-- Particle Background -->
-<div class="particle-bg"></div>
-
-<!-- Settings Button -->
-<button class="settings-btn" onclick="openSettings()">⚙️</button>
-
-<div class="wrap">
-
-  <header class="profile">
-    <div class="profile-banner fortnite"></div>
-
-    <!-- Neon Blue Minimal Square Logo -->
-    <div class="site-logo">
-      <svg viewBox="0 0 100 100">
-        <rect x="10" y="10" width="80" height="80" rx="12" fill="#00aaff"/>
-        <text x="50" y="62" font-size="38" text-anchor="middle" fill="#0b0f12" font-family="Arial Rounded MT Bold">JJ</text>
-      </svg>
+  <!-- Loading Screen with Progress Bar -->
+  <div id="loader" aria-hidden="false">
+    <div class="loader-box" role="status" aria-live="polite">
+      <div class="loader-logo">
+        <!-- small logo inside loader -->
+        <svg viewBox="0 0 100 100" width="48" height="48" aria-hidden="true">
+          <rect x="10" y="10" width="80" height="80" rx="12" fill="#00aaff"/>
+          <text x="50" y="62" font-size="38" text-anchor="middle" fill="#0b0f12" font-family="Arial Rounded MT Bold">JJ</text>
+        </svg>
+      </div>
+      <div class="loader-text">Loading</div>
+      <div class="loader-bar" aria-hidden="true">
+        <div class="loader-progress" id="loaderProgress"></div>
+      </div>
+      <div class="loader-percent" id="loaderPercent">0%</div>
     </div>
+  </div>
 
-    <div class="avatar">JJ</div>
+  <!-- Particle Background -->
+  <div class="particle-bg" aria-hidden="true"></div>
 
-    <div class="meta">
-      <div class="name">
-        <div class="junjun">JunJun</div>
-        <div class="handle">@dev</div>
+  <!-- Settings Button -->
+  <button class="settings-btn" id="openSettings" aria-haspopup="dialog" aria-controls="settingsModal">⚙️</button>
+
+  <main class="wrap" id="siteContent" aria-hidden="true">
+
+    <header class="profile" role="banner">
+      <!-- Banner (flat, themeable) -->
+      <div id="profileBanner" class="profile-banner banner-default" aria-hidden="true"></div>
+
+      <!-- Logo centered above avatar -->
+      <div class="logo-above-avatar" aria-hidden="true">
+        <svg viewBox="0 0 100 100" width="60" height="60" aria-hidden="true">
+          <rect x="10" y="10" width="80" height="80" rx="12" fill="#00aaff"/>
+          <text x="50" y="62" font-size="38" text-anchor="middle" fill="#0b0f12" font-family="Arial Rounded MT Bold">JJ</text>
+        </svg>
       </div>
 
-      <div class="role">Full‑Stack Developer • Game Jam Enthusiast</div>
+      <!-- Avatar centered -->
+      <div class="avatar" role="img" aria-label="JunJun avatar">JJ</div>
 
-      <p class="bio">
-        I build clean, performant web experiences and small browser games.
-      </p>
+      <!-- Meta centered -->
+      <div class="meta">
+        <div class="name">JunJun</div>
+        <div class="handle">@dev</div>
+        <div class="role">Full‑Stack Developer • Game Jam Enthusiast</div>
+        <p class="bio">I build clean, performant web experiences and small browser games.</p>
+      </div>
+    </header>
+
+    <section class="textbar">
+      <div class="label">Explore more fun projects and mini games</div>
+      <a class="link" href="game-website.html">MiniGamesHub</a>
+    </section>
+
+    <section class="textbar">
+      <div class="label">Join my OG Fortnite Discord Server</div>
+      <a class="link" href="https://discord.gg/MSweyqbrxR" target="_blank" rel="noopener">My OG Fortnite Discord Server</a>
+    </section>
+
+  </main>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="settings-modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="settings-content" role="document">
+      <h2>Appearance</h2>
+
+      <div class="settings-section">
+        <h3 class="section-title">Theme</h3>
+        <div class="theme-grid" id="themeGrid">
+          <button data-theme="light">Light</button>
+          <button data-theme="dark">Dark</button>
+          <button data-theme="purple">Purple</button>
+          <button data-theme="neonBlue">Neon Blue</button>
+          <button data-theme="galaxy">Galaxy</button>
+          <button data-theme="galaxyPurple">Galaxy Purple</button>
+          <button data-theme="sunset">Sunset</button>
+          <button data-theme="matrix">Matrix</button>
+          <button data-theme="cyberpunk">Cyberpunk</button>
+          <button data-theme="midnight">Midnight</button>
+        </div>
+      </div>
+
+      <hr>
+
+      <div class="settings-section">
+        <h3 class="section-title">Banner Style</h3>
+        <div class="banner-grid" id="bannerGrid">
+          <button data-banner="blueFade">Blue Fade</button>
+          <button data-banner="purpleFade">Purple Fade</button>
+          <button data-banner="sunset">Sunset</button>
+          <button data-banner="neonBlue">Neon Blue</button>
+          <button data-banner="galaxy">Galaxy</button>
+          <button data-banner="galaxyPurple">Galaxy Purple</button>
+          <button data-banner="midnight">Midnight</button>
+          <button data-banner="matrix">Matrix</button>
+          <button data-banner="cyberpunk">Cyberpunk</button>
+          <button data-banner="iceBlue">Ice Blue</button>
+          <button data-banner="lava">Lava</button>
+          <button data-banner="emerald">Emerald</button>
+          <button data-banner="gold">Gold</button>
+          <button data-banner="vaporwave">Vaporwave</button>
+          <button data-banner="fortniteOG">Fortnite OG</button>
+          <button data-banner="techLines">Tech Lines</button>
+          <button data-banner="pixelGrid">Pixel Grid</button>
+          <button data-banner="neonMesh">Neon Mesh</button>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="close-btn" id="closeSettings">Close</button>
+        <button class="reset-btn" id="resetSettings">Reset</button>
+      </div>
     </div>
-
-    <div class="links">
-      <a class="pill discord-btn" href="https://discord.com/users/1300068854176809081" target="_blank">Add me on Discord</a>
-      <div class="pill">JavaScript</div>
-      <div class="pill">WebGL</div>
-      <div class="pill">Node</div>
-    </div>
-  </header>
-
-  <div class="textbar">
-    <div class="label">Explore more fun projects and mini games</div>
-    <a class="link" href="game-website.html">MiniGamesHub</a>
   </div>
 
-  <div class="textbar">
-    <div class="label">Join my OG Fortnite Discord Server</div>
-    <a class="link" href="https://discord.gg/MSweyqbrxR" target="_blank">My OG Fortnite Discord Server</a>
-  </div>
+  <script>
+    /* Loader logic with progress bar */
+    (function() {
+      const loader = document.getElementById('loader');
+      const progressEl = document.getElementById('loaderProgress');
+      const percentEl = document.getElementById('loaderPercent');
+      const siteContent = document.getElementById('siteContent');
 
-</div>
+      // Simulated progress increments for a smooth feel
+      let progress = 0;
+      const targetDuration = 1800; // total ms for progress to reach 100
+      const start = performance.now();
 
-<!-- Settings Modal -->
-<div id="settingsModal" class="settings-modal">
-  <div class="settings-content">
-    <h2>Theme Settings</h2>
+      function step(now) {
+        const elapsed = now - start;
+        // ease-out progression
+        const t = Math.min(1, elapsed / targetDuration);
+        // ease function (smooth)
+        const eased = 1 - Math.pow(1 - t, 2);
+        progress = Math.floor(eased * 100);
+        progressEl.style.width = progress + '%';
+        percentEl.textContent = progress + '%';
 
-    <div class="theme-grid">
-      <button onclick="setTheme('light')">Light</button>
-      <button onclick="setTheme('dark')">Dark</button>
-      <button onclick="setTheme('purple')">Purple</button>
-      <button onclick="setTheme('galaxy')">Galaxy</button>
-      <button onclick="setTheme('galaxyPurple')">Galaxy Purple</button>
-      <button onclick="setTheme('neonBlue')">Neon Blue</button>
-      <button onclick="setTheme('sunset')">Sunset</button>
-      <button onclick="setTheme('matrix')">Matrix</button>
-      <button onclick="setTheme('cyberpunk')">Cyberpunk</button>
-      <button onclick="setTheme('midnight')">Midnight</button>
-    </div>
+        if (t < 1) {
+          requestAnimationFrame(step);
+        } else {
+          // small delay to let users see 100%
+          setTimeout(() => {
+            loader.style.opacity = '0';
+            loader.style.visibility = 'hidden';
+            loader.setAttribute('aria-hidden', 'true');
+            siteContent.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('loaded');
+          }, 220);
+        }
+      }
 
-    <button class="close-btn" onclick="closeSettings()">Close</button>
-  </div>
-</div>
+      // Start immediately on script run (page entry)
+      requestAnimationFrame(step);
+    })();
 
-<script>
-function openSettings() {
-  document.getElementById("settingsModal").style.display = "flex";
-}
+    /* Theme and Banner selection logic */
+    (function() {
+      const themeGrid = document.getElementById('themeGrid');
+      const bannerGrid = document.getElementById('bannerGrid');
+      const settingsModal = document.getElementById('settingsModal');
+      const openSettings = document.getElementById('openSettings');
+      const closeSettings = document.getElementById('closeSettings');
+      const resetSettings = document.getElementById('resetSettings');
+      const profileBanner = document.getElementById('profileBanner');
 
-function closeSettings() {
-  document.getElementById("settingsModal").style.display = "none";
-}
+      // Apply saved settings on load
+      const savedTheme = localStorage.getItem('siteTheme');
+      const savedBanner = localStorage.getItem('siteBanner');
 
-function setTheme(theme) {
-  document.body.setAttribute("data-theme", theme);
-  localStorage.setItem("siteTheme", theme);
-}
+      if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
+      if (savedBanner) {
+        profileBanner.className = 'profile-banner banner-' + savedBanner;
+      } else {
+        profileBanner.className = 'profile-banner banner-default';
+      }
 
-window.onload = () => {
-  const saved = localStorage.getItem("siteTheme");
-  if (saved) document.body.setAttribute("data-theme", saved);
-};
-</script>
+      // Theme buttons
+      themeGrid.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-theme]');
+        if (!btn) return;
+        const theme = btn.getAttribute('data-theme');
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('siteTheme', theme);
+      });
+
+      // Banner buttons
+      bannerGrid.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-banner]');
+        if (!btn) return;
+        const banner = btn.getAttribute('data-banner');
+        profileBanner.className = 'profile-banner banner-' + banner;
+        localStorage.setItem('siteBanner', banner);
+      });
+
+      // Modal open/close
+      openSettings.addEventListener('click', () => {
+        settingsModal.style.display = 'flex';
+        settingsModal.setAttribute('aria-hidden', 'false');
+      });
+      closeSettings.addEventListener('click', () => {
+        settingsModal.style.display = 'none';
+        settingsModal.setAttribute('aria-hidden', 'true');
+      });
+
+      // Reset
+      resetSettings.addEventListener('click', () => {
+        localStorage.removeItem('siteTheme');
+        localStorage.removeItem('siteBanner');
+        document.body.removeAttribute('data-theme');
+        profileBanner.className = 'profile-banner banner-default';
+      });
+
+      // Close modal on outside click
+      settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) {
+          settingsModal.style.display = 'none';
+          settingsModal.setAttribute('aria-hidden', 'true');
+        }
+      });
+
+      // Keyboard accessibility: Esc to close
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          settingsModal.style.display = 'none';
+          settingsModal.setAttribute('aria-hidden', 'true');
+        }
+      });
+    })();
+  </script>
 
 </body>
 </html>
+
