@@ -1,0 +1,296 @@
+/* Root variables */
+:root {
+  --bg:#0b0f12;
+  --card:#0f1720;
+  --muted:#9aa4b2;
+  --accent:#7c5cff;
+  --glass: rgba(255,255,255,0.03);
+  --glass-2: rgba(255,255,255,0.02);
+  --shadow: 0 6px 18px rgba(2,6,23,0.6);
+  --radius:14px;
+  --transition: 250ms cubic-bezier(.2,.9,.3,1);
+}
+
+/* Global */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: #e6eef8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  min-height: 100vh;
+}
+
+/* Wrapper */
+.wrap {
+  width: 100%;
+  max-width: 980px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Profile Card */
+.profile {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: var(--radius);
+  padding: 28px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255,255,255,0.03);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.profile:hover {
+  transform: translateY(-6px) scale(1.002);
+  box-shadow: 0 18px 40px rgba(2,6,23,0.75);
+}
+
+/* Profile Banner */
+.profile-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  z-index: 0;
+  opacity: 0.9;
+  pointer-events: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.profile-banner.fortnite {
+  background: radial-gradient(circle at 30% 40%, #7c5cff 0%, transparent 60%),
+              radial-gradient(circle at 70% 60%, #4cc9f0 0%, transparent 60%),
+              #0b0f12;
+  filter: blur(12px);
+}
+
+/* Avatar */
+.avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #4cc9f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 34px;
+  color: #071018;
+  flex-shrink: 0;
+  transition: var(--transition);
+  box-shadow: 0 6px 18px rgba(124,92,255,0.12);
+  position: relative;
+  z-index: 2;
+}
+
+.profile:hover .avatar {
+  transform: scale(1.08) rotate(-3deg);
+}
+
+/* Meta */
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.handle {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.role {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bio {
+  color: #cfe6ff;
+  opacity: 0.9;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+/* Links */
+.links {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.pill {
+  background: var(--glass);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.02);
+  transition: var(--transition);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pill:hover {
+  transform: translateY(-4px);
+  background: rgba(124,92,255,0.12);
+  color: #fff;
+}
+
+/* Discord Button */
+.discord-btn {
+  background: linear-gradient(90deg, #5865F2, #4752C4);
+  color: #fff !important;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(88,101,242,0.25);
+}
+
+.discord-btn:hover {
+  background: linear-gradient(90deg, #6C77FF, #5865F2);
+}
+
+/* Textbars */
+.textbar {
+  border-radius: 12px;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,0.03);
+  box-shadow: 0 8px 30px rgba(2,6,23,0.5);
+}
+
+.label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.link {
+  color: #fff;
+  background: linear-gradient(90deg, var(--accent), #4cc9f0);
+  padding: 8px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+.link:hover {
+  transform: translateY(-4px);
+}
+
+/* Settings Button */
+.settings-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 18px;
+  backdrop-filter: blur(6px);
+  transition: 0.25s;
+  z-index: 999;
+}
+
+.settings-btn:hover {
+  transform: scale(1.1);
+}
+
+/* Modal */
+.settings-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(6px);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.settings-content {
+  background: #111827;
+  padding: 28px;
+  border-radius: 16px;
+  width: 340px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  animation: fadeIn 0.3s ease;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.theme-grid button {
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.theme-grid button:hover {
+  background: rgba(255,255,255,0.18);
+}
+
+.close-btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #7c5cff;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.close-btn:hover {
+  background: #9d82ff;
+}
+
+/* Themes */
+body[data-theme="light"] { --bg:#f4f4f4; --card:#fff; --muted:#555; color:#111; }
+body[data-theme="dark"] { --bg:#0b0f12; }
+body[data-theme="purple"] { --bg:#1a1028; --accent:#b57bff; }
+body[data-theme="galaxy"] { --bg:radial-gradient(circle at top,#1a1a3d,#000); }
+body[data-theme="galaxyPurple"] { --bg:radial-gradient(circle at top,#2a0a4a,#000); }
+body[data-theme="neonBlue"] { --bg:#00111f; --accent:#00aaff; }
+body[data-theme="sunset"] { --bg:#2b0a00; --accent:#ff7a3d; }
+body[data-theme="matrix"] { --bg:#001a00; --accent:#00ff41; }
+body[data-theme="cyberpunk"] { --bg:#1a0015; --accent:#ff2ec4; }
+body[data-theme="midnight"] { --bg:#020b24; --accent:#4c6fff; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
