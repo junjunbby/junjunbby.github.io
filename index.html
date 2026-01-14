@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>JunJun — Dev Profile</title>
 
-  <!-- Google Font (optional) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
   <style>
@@ -16,7 +15,6 @@
       --accent:#7c5cff;
       --glass: rgba(255,255,255,0.03);
       --glass-2: rgba(255,255,255,0.02);
-      --success:#4ade80;
       --shadow: 0 6px 18px rgba(2,6,23,0.6);
       --radius:14px;
       --transition: 250ms cubic-bezier(.2,.9,.3,1);
@@ -29,8 +27,6 @@
       font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
       background: linear-gradient(180deg, var(--bg) 0%, #071018 100%);
       color:#e6eef8;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -38,17 +34,14 @@
       min-height:100vh;
     }
 
-    /* Container */
     .wrap{
       width:100%;
       max-width:980px;
       display:flex;
       flex-direction:column;
       gap:28px;
-      align-items:stretch;
     }
 
-    /* Top profile card */
     .profile{
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
       border-radius:var(--radius);
@@ -59,11 +52,8 @@
       box-shadow:var(--shadow);
       border:1px solid rgba(255,255,255,0.03);
       transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
-      position:relative;
-      overflow:hidden;
     }
 
-    /* Hover effects for the top area */
     .profile:hover{
       transform: translateY(-6px) scale(1.002);
       box-shadow: 0 18px 40px rgba(2,6,23,0.75);
@@ -104,7 +94,6 @@
       gap:12px;
       font-size:20px;
       font-weight:700;
-      letter-spacing:0.2px;
     }
 
     .name .handle{
@@ -127,7 +116,6 @@
       line-height:1.45;
     }
 
-    /* small stats / links */
     .links{
       margin-left:auto;
       display:flex;
@@ -144,6 +132,7 @@
       border:1px solid rgba(255,255,255,0.02);
       transition: transform var(--transition), background var(--transition), color var(--transition);
       cursor:pointer;
+      text-decoration:none;
     }
 
     .pill:hover{
@@ -152,58 +141,20 @@
       color:#fff;
     }
 
-    /* subtle underline hover on name */
-    .name .junjun{
-      position:relative;
-      padding-bottom:4px;
-    }
-    .name .junjun::after{
-      content:"";
-      position:absolute;
-      left:0;
-      right:0;
-      bottom:0;
-      height:2px;
-      background:linear-gradient(90deg,var(--accent),#4cc9f0);
-      transform:scaleX(0);
-      transform-origin:left center;
-      transition: transform var(--transition);
-      border-radius:2px;
-      opacity:0.95;
-    }
-    .profile:hover .name .junjun::after{
-      transform:scaleX(1);
+    .discord-btn{
+      background: linear-gradient(90deg, #5865F2, #4752C4);
+      color:#fff !important;
+      font-weight:600;
+      box-shadow:0 8px 24px rgba(88,101,242,0.25);
     }
 
-    /* social row */
-    .social{
-      display:flex;
-      gap:10px;
-      margin-top:10px;
-    }
-    .social a{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      width:36px;
-      height:36px;
-      border-radius:8px;
-      background:var(--glass-2);
-      color:var(--muted);
-      text-decoration:none;
-      font-size:14px;
-      transition: transform var(--transition), background var(--transition), color var(--transition);
-      border:1px solid rgba(255,255,255,0.02);
-    }
-    .social a:hover{
-      transform: translateY(-6px) scale(1.03);
-      background: linear-gradient(90deg, rgba(124,92,255,0.12), rgba(76,201,240,0.06));
-      color:#fff;
+    .discord-btn:hover{
+      background: linear-gradient(90deg, #6C77FF, #5865F2);
+      transform: translateY(-4px);
+      box-shadow:0 14px 32px rgba(88,101,242,0.35);
     }
 
-    /* bottom textbar fixed-ish */
     .textbar{
-      margin-top:12px;
       border-radius:12px;
       padding:14px 18px;
       background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
@@ -215,18 +166,12 @@
       box-shadow: 0 8px 30px rgba(2,6,23,0.5);
     }
 
-    .textbar .left{
-      display:flex;
-      gap:12px;
-      align-items:center;
-    }
-
-    .textbar .label{
+    .label{
       color:var(--muted);
       font-size:13px;
     }
 
-    .textbar .link{
+    .link{
       color:#fff;
       background:linear-gradient(90deg,var(--accent),#4cc9f0);
       padding:8px 12px;
@@ -238,27 +183,26 @@
       box-shadow: 0 8px 24px rgba(124,92,255,0.12);
     }
 
-    .textbar .link:hover{
+    .link:hover{
       transform: translateY(-4px);
       opacity:0.98;
       box-shadow: 0 18px 40px rgba(124,92,255,0.18);
     }
 
-    /* responsive */
     @media (max-width:720px){
       .profile{flex-direction:column;align-items:flex-start;padding:20px}
       .links{margin-left:0;width:100%;justify-content:space-between}
       .textbar{flex-direction:column;align-items:stretch}
-      .textbar .left{width:100%;justify-content:space-between}
     }
   </style>
 </head>
+
 <body>
   <div class="wrap">
 
-    <!-- Top: Dev profile -->
-    <header class="profile" aria-label="Developer profile JunJun">
-      <div class="avatar" aria-hidden="true">JJ</div>
+    <!-- Profile -->
+    <header class="profile">
+      <div class="avatar">JJ</div>
 
       <div class="meta">
         <div class="name">
@@ -271,46 +215,32 @@
         <p class="bio">
           I build clean, performant web experiences and small browser games. I focus on accessible UI, smooth interactions, and playful micro‑UX.
         </p>
-
-        <div class="social" aria-label="Social links">
-          <a href="#" title="GitHub" aria-label="GitHub">GH</a>
-          <a href="#" title="Twitter" aria-label="Twitter">TW</a>
-          <a href="#" title="Portfolio" aria-label="Portfolio">PT</a>
-        </div>
       </div>
 
-      <div class="links" aria-hidden="true">
+      <div class="links">
+        <a class="pill discord-btn" href="https://discord.com/users/1300068854176809081" target="_blank">
+          Add me on Discord
+        </a>
         <div class="pill">JavaScript</div>
         <div class="pill">WebGL</div>
         <div class="pill">Node</div>
       </div>
     </header>
 
-    <!-- Bottom: Textbar with MiniGamesHub link -->
-    <div class="textbar" role="contentinfo" aria-label="MiniGamesHub link bar">
-      <div class="left">
-        <div class="label">Explore more fun projects and mini games</div>
-      </div>
+    <!-- MiniGamesHub -->
+    <div class="textbar">
+      <div class="label">Explore more fun projects and mini games</div>
+      <a class="link" href="game-website.html">MiniGamesHub</a>
+    </div>
 
-      <div class="right">
-        <a class="link" href="game-website.html">MiniGamesHub</a>
-      </div>
+    <!-- Fortnite Discord Server -->
+    <div class="textbar">
+      <div class="label">Join my OG Fortnite Discord Server</div>
+      <a class="link" href="https://discord.gg/MSweyqbrxR" target="_blank">
+        My OG Fortnite Discord Server
+      </a>
     </div>
 
   </div>
-
-  <!-- Small JS for keyboard focus and subtle accessibility improvements -->
-  <script>
-    // Add focus-visible class for keyboard users
-    (function(){
-      function handleFirstTab(e){
-        if(e.key === 'Tab'){
-          document.documentElement.classList.add('user-is-tabbing');
-          window.removeEventListener('keydown', handleFirstTab);
-        }
-      }
-      window.addEventListener('keydown', handleFirstTab);
-    })();
-  </script>
 </body>
 </html>
