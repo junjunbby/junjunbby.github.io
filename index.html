@@ -124,10 +124,10 @@
     </div>
   </div>
 
-  <!-- Chaos Button + Counter (floating right middle) -->
+  <!-- Chaos Clicker (floating right middle) -->
   <div class="chaos-wrapper" aria-hidden="false">
-    <button id="chaosBtn" class="chaos-btn" aria-label="Activate chaos">CHAOS</button>
-    <div class="chaos-counter" id="chaosCounter">Chaos: 0</div>
+    <button id="chaosBtn" class="chaos-btn" aria-label="Activate Chaos Clicker">Chaos Clicker</button>
+    <div class="chaos-counter" id="chaosCounter">Chaos Clicker: 0</div>
   </div>
 
   <script>
@@ -259,7 +259,7 @@
     })();
   </script>
 
-  <!-- Chaos System Script -->
+  <!-- Chaos Clicker System Script -->
   <script>
   (function(){
     const chaosBtn = document.getElementById('chaosBtn');
@@ -361,7 +361,7 @@
       () => { const labels = document.querySelectorAll('.textbar .label'); if(labels.length) quickClassPulse(randomFrom(Array.from(labels)),'chaos-wiggle',380); playChaosSound('blip'); },
       () => { addFlash(); playChaosSound('boom'); },
       () => { body.style.transition = 'transform 220ms ease'; body.style.transform = 'rotate(' + (Math.random() > 0.5 ? 2 : -2) + 'deg)'; setTimeout(()=>body.style.transform='',260); playChaosSound('blip'); },
-      () => { chaosBtn.textContent = randomFrom(["CHAOS","MORE","AGAIN","WHY","HELP","OKAY"]); setTimeout(()=>chaosBtn.textContent='CHAOS', 800); playChaosSound('blip'); },
+      () => { chaosBtn.textContent = randomFrom(["Chaos Clicker","MORE","AGAIN","WHY","HELP","OKAY"]); setTimeout(()=>chaosBtn.textContent='Chaos Clicker', 800); playChaosSound('blip'); },
       () => { if(profileBanner){ profileBanner.style.transition = 'transform 260ms ease'; profileBanner.style.transform = 'translateX(110%)'; setTimeout(()=>{ profileBanner.style.transform = 'translateX(0)'; },260); setTimeout(()=>{ profileBanner.style.transition=''; },620); } playChaosSound('zap'); },
       () => { body.style.filter = 'invert(1) hue-rotate(180deg)'; setTimeout(()=>body.style.filter='',280); playChaosSound('zap'); },
       () => { const bars = document.querySelectorAll('.textbar'); if(bars.length){ const target = randomFrom(Array.from(bars)); const oldBg = getComputedStyle(target).background; target.style.transition = 'background 220ms ease'; target.style.background = 'rgba(255,255,255,0.10)'; setTimeout(()=>target.style.background = oldBg,260); } playChaosSound('blip'); },
@@ -395,7 +395,7 @@
     }
 
     /* Counter update */
-    function updateChaosCounter(){ chaosCounterEl.textContent = 'Chaos: ' + chaosCount; }
+    function updateChaosCounter(){ chaosCounterEl.textContent = 'Chaos Clicker: ' + chaosCount; }
 
     /* Cooldown + click handler */
     chaosBtn.addEventListener('click', () => {
