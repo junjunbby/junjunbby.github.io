@@ -3,450 +3,243 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>JunJun — Dev Profile</title>
+  <title>LinkHub — Your single profile page</title>
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- Loading Screen with Progress Bar -->
-  <div id="loader" aria-hidden="false">
-    <div class="loader-box" role="status" aria-live="polite">
-      <div class="loader-logo" aria-hidden="true">
-        <svg viewBox="0 0 100 100" width="48" height="48" aria-hidden="true">
-          <rect x="10" y="10" width="80" height="80" rx="12" fill="#00aaff"/>
-          <text x="50" y="62" font-size="38" text-anchor="middle" fill="#0b0f12" font-family="Arial Rounded MT Bold">JJ</text>
-        </svg>
+  <!-- Top navigation -->
+  <header class="topbar" role="banner">
+    <div class="container topbar-inner">
+      <a class="brand" href="/">
+        <span class="brand-logo">LH</span>
+        <span class="brand-name">LinkHub</span>
+      </a>
+
+      <nav class="nav" aria-label="Main">
+        <a href="/junjun.html">JunJun</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#upload">Host Media</a>
+        <a href="#help">Help</a>
+      </nav>
+
+      <div class="actions">
+        <a class="btn ghost" href="/signup.html">Sign up</a>
+        <a class="btn primary" href="/login.html">Log in</a>
       </div>
-      <div class="loader-text" id="loaderState">Loading</div>
-      <div class="loader-bar" aria-hidden="true">
-        <div class="loader-progress" id="loaderProgress"></div>
-      </div>
-      <div class="loader-percent" id="loaderPercent">0%</div>
     </div>
-  </div>
+  </header>
 
-  <!-- Particle Background -->
-  <div class="particle-bg" aria-hidden="true"></div>
+  <!-- Hero / product summary -->
+  <main class="hero" id="top" role="main">
+    <div class="container hero-grid">
+      <div class="hero-left">
+        <h1 class="title">One profile. All your links. Built‑in media hosting.</h1>
+        <p class="lead">Create a single, customizable landing page that aggregates your socials, projects, and files. Share one URL and let visitors explore everything you want them to see.</p>
 
-  <!-- Settings Button -->
-  <button class="settings-btn" id="openSettings" aria-haspopup="dialog" aria-controls="settingsModal">⚙️</button>
+        <div class="cta-row">
+          <a class="btn primary" href="/signup.html">Create free profile</a>
+          <a class="btn ghost" href="#features">See features</a>
+        </div>
 
-  <main class="wrap" id="siteContent" aria-hidden="true">
-
-    <header class="profile" role="banner">
-      <!-- Banner (flat, themeable) -->
-      <div id="profileBanner" class="profile-banner banner-default" aria-hidden="true"></div>
-
-      <!-- Logo centered above avatar -->
-      <div class="logo-above-avatar" aria-hidden="true">
-        <svg viewBox="0 0 100 100" width="60" height="60" aria-hidden="true">
-          <rect x="10" y="10" width="80" height="80" rx="12" fill="#00aaff"/>
-          <text x="50" y="62" font-size="38" text-anchor="middle" fill="#0b0f12" font-family="Arial Rounded MT Bold">JJ</text>
-        </svg>
+        <ul class="quick-list">
+          <li><strong>Link-in-bio pages</strong> with custom ordering and icons</li>
+          <li><strong>Image & short video hosting</strong> on a dedicated host</li>
+          <li><strong>Basic analytics</strong> for free accounts</li>
+        </ul>
       </div>
 
-      <!-- Avatar centered -->
-      <div class="avatar" role="img" aria-label="JunJun avatar">JJ</div>
+      <aside class="hero-right" aria-hidden="true">
+        <div class="preview-card">
+          <div class="preview-header">
+            <div class="avatar">JJ</div>
+            <div class="preview-meta">
+              <div class="preview-name">JunJun</div>
+              <div class="preview-handle">@dev</div>
+            </div>
+          </div>
 
-      <!-- Meta centered -->
-      <div class="meta">
-        <div class="name">JunJun</div>
-        <div class="handle">@dev</div>
-        <div class="role">Full‑Stack Developer • Game Jam Enthusiast</div>
-        <p class="bio">I build clean, performant web experiences and small browser games.</p>
-        <div class="visitor-stats" id="visitorStats">Visitors: —</div>
-      </div>
-    </header>
+          <div class="preview-links">
+            <a class="preview-link" href="https://twitter.com/">Twitter</a>
+            <a class="preview-link" href="https://github.com/">GitHub</a>
+            <a class="preview-link" href="https://example.com/">Portfolio</a>
+            <a class="preview-link" href="junjun.html">Open profile</a>
+          </div>
 
-    <section class="textbar">
-      <div class="label">Explore more fun projects and mini games</div>
-      <a class="link" href="game-website.html">MiniGamesHub</a>
-    </section>
-
-    <section class="textbar">
-      <div class="label">Join my OG Fortnite Discord Server</div>
-      <a class="link" href="https://discord.gg/MSweyqbrxR" target="_blank" rel="noopener">My OG Fortnite Discord Server</a>
-    </section>
-
+          <div class="preview-media">
+            <div class="media-thumb">Image host preview</div>
+          </div>
+        </div>
+      </aside>
+    </div>
   </main>
 
-  <!-- Settings Modal -->
-  <div id="settingsModal" class="settings-modal" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="settings-content" role="document">
-      <h2>Appearance</h2>
+  <!-- Features -->
+  <section id="features" class="section features">
+    <div class="container">
+      <h2 class="section-title">Main features</h2>
 
-      <div class="settings-section">
-        <h3 class="section-title">Theme</h3>
-        <div class="theme-grid" id="themeGrid">
-          <button data-theme="light">Light</button>
-          <button data-theme="dark">Dark</button>
-          <button data-theme="purple">Purple</button>
-          <button data-theme="neonBlue">Neon Blue</button>
-          <button data-theme="galaxy">Galaxy</button>
-          <button data-theme="galaxyPurple">Galaxy Purple</button>
-          <button data-theme="sunset">Sunset</button>
-          <button data-theme="matrix">Matrix</button>
-          <button data-theme="cyberpunk">Cyberpunk</button>
-          <button data-theme="midnight">Midnight</button>
+      <div class="grid-3">
+        <div class="feature">
+          <h3>Link-in-Bio Pages</h3>
+          <p>Create a personalized landing page with all your social links, content, portfolio, or shop links. Share one URL and let visitors click through to everything you want them to see.</p>
+        </div>
+
+        <div class="feature">
+          <h3>Customization</h3>
+          <p>Free accounts get basic styling and analytics. Premium unlocks layouts, fonts, animations, badges, and SEO metadata controls.</p>
+        </div>
+
+        <div class="feature">
+          <h3>Built-in Image Hosting</h3>
+          <p>Upload images and short videos for display or sharing. Media served from a dedicated host domain for easy embedding and sharing.</p>
+        </div>
+
+        <div class="feature">
+          <h3>Analytics & Sharing</h3>
+          <p>Profile views and basic stats are available on the free plan to help creators gauge traffic and engagement.</p>
+        </div>
+
+        <div class="feature">
+          <h3>Multilingual & Tools</h3>
+          <p>Supports multiple languages and includes quick setup guides in the help center for fast onboarding.</p>
+        </div>
+
+        <div class="feature">
+          <h3>Community & Support</h3>
+          <p>Active Discord community for sharing profiles, getting help, and participating in creative contests.</p>
         </div>
       </div>
+    </div>
+  </section>
 
-      <hr>
+  <!-- Upload / hosting teaser -->
+  <section id="upload" class="section upload">
+    <div class="container upload-grid">
+      <div class="upload-left">
+        <h2>Host images and short videos</h2>
+        <p>Upload files to display on your profile or share via a direct link. Files are optimized for fast delivery and previewed in your profile gallery.</p>
+        <ul>
+          <li>Direct links for sharing</li>
+          <li>Small gallery on your profile</li>
+          <li>Optional enhanced hosting for premium users</li>
+        </ul>
+        <a class="btn primary" href="/upload.html">Upload a file</a>
+      </div>
 
-      <div class="settings-section">
-        <h3 class="section-title">Banner Style</h3>
-        <div class="banner-grid" id="bannerGrid">
-          <button data-banner="blueFade">Blue Fade</button>
-          <button data-banner="purpleFade">Purple Fade</button>
-          <button data-banner="sunset">Sunset</button>
-          <button data-banner="neonBlue">Neon Blue</button>
-          <button data-banner="galaxy">Galaxy</button>
-          <button data-banner="galaxyPurple">Galaxy Purple</button>
-          <button data-banner="midnight">Midnight</button>
-          <button data-banner="matrix">Matrix</button>
-          <button data-banner="cyberpunk">Cyberpunk</button>
-          <button data-banner="iceBlue">Ice Blue</button>
-          <button data-banner="lava">Lava</button>
-          <button data-banner="emerald">Emerald</button>
-          <button data-banner="gold">Gold</button>
-          <button data-banner="vaporwave">Vaporwave</button>
-          <button data-banner="fortniteOG">Fortnite OG</button>
-          <button data-banner="techLines">Tech Lines</button>
-          <button data-banner="pixelGrid">Pixel Grid</button>
-          <button data-banner="neonMesh">Neon Mesh</button>
+      <div class="upload-right" aria-hidden="true">
+        <div class="upload-box">
+          <div class="upload-icon">📤</div>
+          <div class="upload-text">Drag & drop or click to upload</div>
+          <div class="upload-note">Supported: JPG, PNG, GIF, MP4. Max file size depends on plan.</div>
         </div>
       </div>
+    </div>
+  </section>
 
-      <hr>
+  <!-- Pricing -->
+  <section id="pricing" class="section pricing">
+    <div class="container">
+      <h2 class="section-title">Plans</h2>
 
-      <div class="settings-section">
-        <h3 class="section-title">Chaos Clicker</h3>
-        <label class="toggle-row">
-          <input type="checkbox" id="disableChaosToggle">
-          <span>Disable Chaos Clicker</span>
-        </label>
-        <div style="height:8px"></div>
-        <button id="resetChaosBtn" class="reset-chaos">Reset Chaos Count</button>
-      </div>
+      <div class="pricing-grid">
+        <div class="plan card">
+          <h3>Free</h3>
+          <div class="price">€0</div>
+          <ul>
+            <li>Lifetime free access</li>
+            <li>Basic customization</li>
+            <li>Profile analytics</li>
+            <li>Image hosting (limited)</li>
+          </ul>
+          <a class="btn primary" href="/signup.html">Get started</a>
+        </div>
 
-      <div class="settings-actions">
-        <button class="close-btn" id="closeSettings">Close</button>
-        <button class="reset-btn" id="resetSettings">Reset Appearance</button>
+        <div class="plan card featured">
+          <h3>Premium</h3>
+          <div class="price">€6.99</div>
+          <ul>
+            <li>Advanced styling and layouts</li>
+            <li>Custom badges and fonts</li>
+            <li>Enhanced image hosting</li>
+            <li>Priority support</li>
+          </ul>
+          <a class="btn primary" href="/signup.html?plan=premium">Buy once</a>
+        </div>
+
+        <div class="plan card">
+          <h3>Add-ons</h3>
+          <div class="price">Optional</div>
+          <ul>
+            <li>Badge creator</li>
+            <li>Verified badge</li>
+            <li>Custom image host domain</li>
+          </ul>
+          <a class="btn ghost" href="#contact">Contact sales</a>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Achievements Panel -->
-  <div id="achievementsPanel" class="achievements-panel" aria-hidden="true" role="dialog" aria-label="Achievements">
-    <div class="achievements-header">
-      <strong>Achievements</strong>
-      <button id="closeAchievements" class="close-small" aria-label="Close achievements">✕</button>
+  <!-- Trust & safety -->
+  <section class="section trust">
+    <div class="container">
+      <h2 class="section-title">Safety & reputation</h2>
+      <p>We publish a privacy policy and terms of service that explain user rights and content rules. Profiles and uploads must follow community guidelines. We provide tools for content removal and GDPR requests.</p>
+      <div class="trust-grid">
+        <div class="trust-item">
+          <strong>Legitimacy</strong>
+          <p>HTTPS, security scanning, and public reviews indicate strong trust signals.</p>
+        </div>
+        <div class="trust-item">
+          <strong>Moderation</strong>
+          <p>Automated and manual moderation for abuse and misuse of hosting features.</p>
+        </div>
+        <div class="trust-item">
+          <strong>Privacy</strong>
+          <p>Users control their content and can request deletion of data.</p>
+        </div>
+      </div>
     </div>
-    <div class="achievements-list" id="achievementsList" role="list"></div>
-  </div>
+  </section>
 
-  <!-- Floating Achievements Button -->
-  <div class="achieve-wrapper" aria-hidden="false">
-    <button id="openAchievements" class="achieve-btn" aria-label="Open achievements">🏆</button>
-  </div>
+  <!-- Footer -->
+  <footer id="help" class="footer">
+    <div class="container footer-inner">
+      <div class="footer-left">
+        <div class="brand small">
+          <span class="brand-logo">LH</span>
+          <span class="brand-name">LinkHub</span>
+        </div>
+        <div class="muted">© <span id="year"></span> LinkHub</div>
+      </div>
 
-  <!-- Chaos Clicker (floating right middle) -->
-  <div class="chaos-wrapper" aria-hidden="false">
-    <button id="chaosBtn" class="chaos-btn" aria-label="Activate Chaos Clicker">Chaos Clicker</button>
-    <div class="chaos-counter" id="chaosCounter">Chaos Clicker: 0</div>
-  </div>
+      <div class="footer-right">
+        <nav class="footer-nav">
+          <a href="/terms.html">Terms</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="/help-center.html">Help Center</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
 
   <script>
-    /* Loader logic with progress bar and dynamic state text */
-    (function() {
-      const loader = document.getElementById('loader');
-      const progressEl = document.getElementById('loaderProgress');
-      const percentEl = document.getElementById('loaderPercent');
-      const stateEl = document.getElementById('loaderState');
-      const siteContent = document.getElementById('siteContent');
+    // small helpers
+    document.getElementById('year').textContent = new Date().getFullYear();
 
-      let progress = 0;
-      const targetDuration = 1800;
-      const start = performance.now();
-
-      function step(now) {
-        const elapsed = now - start;
-        const t = Math.min(1, elapsed / targetDuration);
-        const eased = 1 - Math.pow(1 - t, 2);
-        progress = Math.floor(eased * 100);
-        progressEl.style.width = progress + '%';
-        percentEl.textContent = progress + '%';
-
-        if (progress < 30) stateEl.textContent = 'Preparing assets...';
-        else if (progress < 70) stateEl.textContent = 'Applying themes...';
-        else if (progress < 95) stateEl.textContent = 'Almost ready...';
-        else stateEl.textContent = 'Done';
-
-        if (t < 1) {
-          requestAnimationFrame(step);
-        } else {
-          setTimeout(() => {
-            loader.style.opacity = '0';
-            loader.style.visibility = 'hidden';
-            loader.setAttribute('aria-hidden', 'true');
-            siteContent.setAttribute('aria-hidden', 'false');
-            document.body.classList.add('loaded');
-          }, 220);
-        }
-      }
-
-      requestAnimationFrame(step);
-    })();
-
-    /* Theme and Banner selection logic with swatch active state */
-    (function() {
-      const themeGrid = document.getElementById('themeGrid');
-      const bannerGrid = document.getElementById('bannerGrid');
-      const settingsModal = document.getElementById('settingsModal');
-      const openSettings = document.getElementById('openSettings');
-      const closeSettings = document.getElementById('closeSettings');
-      const resetSettings = document.getElementById('resetSettings');
-      const profileBanner = document.getElementById('profileBanner');
-
-      const savedTheme = localStorage.getItem('siteTheme');
-      const savedBanner = localStorage.getItem('siteBanner');
-
-      if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
-      if (savedBanner) {
-        profileBanner.className = 'profile-banner banner-' + savedBanner;
-        const btn = bannerGrid.querySelector('button[data-banner="'+savedBanner+'"]');
-        if(btn) btn.classList.add('active');
-      } else {
-        profileBanner.className = 'profile-banner banner-default';
-      }
-
-      if (savedTheme) {
-        const tbtn = themeGrid.querySelector('button[data-theme="'+savedTheme+'"]');
-        if(tbtn) tbtn.classList.add('active');
-      }
-
-      themeGrid.addEventListener('click', (e) => {
-        const btn = e.target.closest('button[data-theme]');
-        if (!btn) return;
-        const theme = btn.getAttribute('data-theme');
-        document.body.setAttribute('data-theme', theme);
-        localStorage.setItem('siteTheme', theme);
-        themeGrid.querySelectorAll('button[data-theme]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      });
-
-      bannerGrid.addEventListener('click', (e) => {
-        const btn = e.target.closest('button[data-banner]');
-        if (!btn) return;
-        const banner = btn.getAttribute('data-banner');
-        profileBanner.className = 'profile-banner banner-' + banner;
-        localStorage.setItem('siteBanner', banner);
-        bannerGrid.querySelectorAll('button[data-banner]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      });
-
-      openSettings.addEventListener('click', () => {
-        settingsModal.style.display = 'flex';
-        settingsModal.setAttribute('aria-hidden', 'false');
-        const focusable = settingsModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-        if(focusable.length) focusable[0].focus();
-      });
-      closeSettings.addEventListener('click', () => {
-        settingsModal.style.display = 'none';
-        settingsModal.setAttribute('aria-hidden', 'true');
-        openSettings.focus();
-      });
-
-      resetSettings.addEventListener('click', () => {
-        localStorage.removeItem('siteTheme');
-        localStorage.removeItem('siteBanner');
-        document.body.removeAttribute('data-theme');
-        profileBanner.className = 'profile-banner banner-default';
-        themeGrid.querySelectorAll('button[data-theme]').forEach(b => b.classList.remove('active'));
-        bannerGrid.querySelectorAll('button[data-banner]').forEach(b => b.classList.remove('active'));
-      });
-
-      settingsModal.addEventListener('click', (e) => {
-        if (e.target === settingsModal) {
-          settingsModal.style.display = 'none';
-          settingsModal.setAttribute('aria-hidden', 'true');
-          openSettings.focus();
+    // smooth scroll for internal links
+    document.querySelectorAll('a[href^="#"]').forEach(a=>{
+      a.addEventListener('click', e=>{
+        const target = document.querySelector(a.getAttribute('href'));
+        if(target){
+          e.preventDefault();
+          target.scrollIntoView({behavior:'smooth', block:'start'});
         }
       });
-
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          settingsModal.style.display = 'none';
-          settingsModal.setAttribute('aria-hidden', 'true');
-          openSettings.focus();
-        }
-      });
-    })();
+    });
   </script>
-
-  <!-- Chaos Clicker + Achievements + Visitor Stats Script -->
-  <script>
-  (function(){
-    /* Elements */
-    const chaosBtn = document.getElementById('chaosBtn');
-    const chaosCounterEl = document.getElementById('chaosCounter');
-    const disableToggle = document.getElementById('disableChaosToggle');
-    const resetChaosBtn = document.getElementById('resetChaosBtn');
-    const achievementsPanel = document.getElementById('achievementsPanel');
-    const achievementsList = document.getElementById('achievementsList');
-    const openAchievements = document.getElementById('openAchievements');
-    const closeAchievements = document.getElementById('closeAchievements');
-    const visitorStatsEl = document.getElementById('visitorStats');
-
-    /* Config */
-    const ACHIEVEMENTS = [
-      { id: 'ach10', label: 'Novice Chaos', threshold: 10, icon: '🔰' },
-      { id: 'ach25', label: 'Rising Chaos', threshold: 25, icon: '🔥' },
-      { id: 'ach50', label: 'Chaos Veteran', threshold: 50, icon: '💥' },
-      { id: 'ach100', label: 'Chaos Master', threshold: 100, icon: '🏆' }
-    ];
-
-    const KEY_CHAOS = 'chaos_clicker_count';
-    const KEY_ACHIEVEMENTS = 'chaos_achievements_unlocked';
-    const KEY_VISITOR_LOCAL = 'site_visitors_local';
-
-    /* State */
-    let chaosCount = parseInt(localStorage.getItem(KEY_CHAOS) || '0', 10);
-    let unlocked = JSON.parse(localStorage.getItem(KEY_ACHIEVEMENTS) || '[]');
-    let localVisitorCount = parseInt(localStorage.getItem(KEY_VISITOR_LOCAL) || '0', 10);
-
-    /* Utilities */
-    function randomFrom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
-
-    /* Achievements UI */
-    function renderAchievements(){
-      achievementsList.innerHTML = '';
-      ACHIEVEMENTS.forEach(a => {
-        const el = document.createElement('div');
-        el.className = 'achievement-badge' + (unlocked.includes(a.id) ? ' unlocked' : '');
-        el.setAttribute('data-id', a.id);
-        el.innerHTML = `<div style="font-size:20px">${a.icon}</div><div style="font-size:11px;margin-top:6px">${a.label}</div>`;
-        achievementsList.appendChild(el);
-      });
-    }
-
-    function showToast(text){
-      const t = document.createElement('div');
-      t.className = 'achievement-toast';
-      t.textContent = text;
-      document.body.appendChild(t);
-      requestAnimationFrame(()=> t.classList.add('show'));
-      setTimeout(()=> { t.classList.remove('show'); setTimeout(()=> t.remove(), 260); }, 1600);
-    }
-
-    function unlockAchievement(id){
-      if(unlocked.includes(id)) return;
-      unlocked.push(id);
-      localStorage.setItem(KEY_ACHIEVEMENTS, JSON.stringify(unlocked));
-      renderAchievements();
-      const ach = ACHIEVEMENTS.find(x => x.id === id);
-      showToast(`Unlocked: ${ach.label} ${ach.icon}`);
-    }
-
-    function checkAchievements(){
-      ACHIEVEMENTS.forEach(a => {
-        if(chaosCount >= a.threshold) unlockAchievement(a.id);
-      });
-    }
-
-    function updateChaosUI(){
-      chaosCounterEl.textContent = 'Chaos Clicker: ' + chaosCount;
-    }
-
-    function resetChaos(){
-      chaosCount = 0;
-      localStorage.setItem(KEY_CHAOS, String(chaosCount));
-      updateChaosUI();
-    }
-
-    /* Settings controls */
-    if(disableToggle){
-      disableToggle.checked = !!localStorage.getItem('chaos_disabled');
-      disableToggle.addEventListener('change', () => {
-        if(disableToggle.checked) localStorage.setItem('chaos_disabled', '1');
-        else localStorage.removeItem('chaos_disabled');
-      });
-    }
-
-    if(resetChaosBtn){
-      resetChaosBtn.addEventListener('click', () => {
-        resetChaos();
-        unlocked = [];
-        localStorage.removeItem(KEY_ACHIEVEMENTS);
-        renderAchievements();
-        showToast('Chaos reset');
-      });
-    }
-
-    if(openAchievements){
-      openAchievements.addEventListener('click', () => {
-        achievementsPanel.style.display = 'flex';
-        achievementsPanel.setAttribute('aria-hidden', 'false');
-      });
-    }
-    if(closeAchievements){
-      closeAchievements.addEventListener('click', () => {
-        achievementsPanel.style.display = 'none';
-        achievementsPanel.setAttribute('aria-hidden', 'true');
-      });
-    }
-
-    /* Hook into Chaos Clicker */
-    if(chaosBtn){
-      chaosBtn.addEventListener('click', () => {
-        if(localStorage.getItem('chaos_disabled')) return;
-        chaosCount++;
-        localStorage.setItem(KEY_CHAOS, String(chaosCount));
-        updateChaosUI();
-        checkAchievements();
-      });
-    }
-
-    /* Visitor stats: optimistic local increment + optional server POST /api/visit */
-    async function incrementVisitorCount(){
-      localVisitorCount++;
-      localStorage.setItem(KEY_VISITOR_LOCAL, String(localVisitorCount));
-      renderVisitorCount();
-
-      try{
-        const resp = await fetch('/api/visit', { method: 'POST' });
-        if(resp.ok){
-          const data = await resp.json();
-          if(data && typeof data.visitors === 'number'){
-            visitorStatsEl.textContent = 'Visitors: ' + data.visitors;
-            return;
-          }
-        }
-      }catch(e){
-        // ignore network errors, keep local fallback
-      }
-    }
-
-    function renderVisitorCount(){
-      visitorStatsEl.textContent = 'Visitors: ' + localVisitorCount;
-    }
-
-    /* Init */
-    renderAchievements();
-    updateChaosUI();
-    renderVisitorCount();
-    checkAchievements();
-    incrementVisitorCount();
-
-    /* Expose small API */
-    window.__ChaosPrototype = {
-      getChaosCount: () => chaosCount,
-      getUnlocked: () => unlocked.slice(),
-      resetChaos
-    };
-  })();
-  </script>
-
 </body>
 </html>
