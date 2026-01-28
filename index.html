@@ -15,22 +15,47 @@
     }
     #hud {
       position: fixed;
-      top: 8px;
-      left: 8px;
+      top: 12px;
+      left: 12px;
       z-index: 10;
-      font-size: 14px;
+      font-size: 13px;
       pointer-events: none;
       text-shadow: 0 0 4px #000;
     }
+    #hp-bar-wrapper {
+      width: 180px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    #hp-bar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #00ff88, #00c4ff);
+      transition: width 0.1s linear;
+    }
+    #hud-line {
+      opacity: 0.8;
+    }
     #leaderboard {
       position: fixed;
-      top: 8px;
-      right: 8px;
+      top: 12px;
+      right: 12px;
       z-index: 10;
-      font-size: 14px;
+      font-size: 13px;
       text-align: right;
       pointer-events: none;
       text-shadow: 0 0 4px #000;
+    }
+    #leaderboard-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+      opacity: 0.9;
+    }
+    #lb-entries div {
+      opacity: 0.85;
     }
     #center-dot {
       position: fixed;
@@ -44,6 +69,21 @@
       border-radius: 50%;
       pointer-events: none;
       z-index: 10;
+      box-shadow: 0 0 6px #000;
+    }
+    #killfeed {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      z-index: 10;
+      font-size: 12px;
+      text-align: right;
+      pointer-events: none;
+      text-shadow: 0 0 4px #000;
+    }
+    #killfeed div {
+      margin-top: 2px;
+      opacity: 0.9;
     }
     #overlay {
       position: fixed;
@@ -69,18 +109,26 @@
 </head>
 <body>
   <div id="hud">
-    <div id="stats">HP: 100 | Kills: 0 | Deaths: 0</div>
-    <div>WASD to move, mouse to aim, click to shoot</div>
+    <div id="hp-bar-wrapper"><div id="hp-bar"></div></div>
+    <div id="hud-line">
+      <span id="hp-text">HP: 100</span> ·
+      <span id="kd-text">K/D: 0 / 0</span> ·
+      <span id="ammo-text">Rifle · ∞</span>
+    </div>
   </div>
+
   <div id="leaderboard">
-    <div><strong>Leaderboard</strong></div>
+    <div id="leaderboard-title">Leaderboard</div>
     <div id="lb-entries"></div>
   </div>
+
   <div id="center-dot"></div>
+
+  <div id="killfeed"></div>
 
   <div id="overlay">
     <h1>BlockArena 3D</h1>
-    <p>Fast‑paced FPS arena. No login, just play.</p>
+    <p>Fast‑paced hitscan arena shooter. No login, just play.</p>
     <input id="name-input" placeholder="Your name" maxlength="12" />
     <button id="play-btn">Click to Play</button>
     <small>Game will capture your mouse (Pointer Lock).</small>
@@ -88,11 +136,15 @@
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
   <script>
-    // basic three.js setup
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
@@ -103,14 +155,12 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // lights
     const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 0.9);
     scene.add(hemi);
     const dir = new THREE.DirectionalLight(0xffffff, 0.6);
     dir.position.set(10, 20, 10);
     scene.add(dir);
 
-    // arena floor + walls
     const floorGeo = new THREE.PlaneGeometry(80, 80);
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -127,7 +177,6 @@
     const wall4 = wall3.clone(); wall4.position.set(40, 4, 0);
     scene.add(wall1, wall2, wall3, wall4);
 
-    // some obstacles
     const boxGeo = new THREE.BoxGeometry(6, 6, 6);
     const boxMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
     const obstacles = [];
@@ -142,17 +191,19 @@
       obstacles.push(box);
     }
 
-    // HUD
-    const statsEl = document.getElementById('stats');
+    const hpBar = document.getElementById('hp-bar');
+    const hpText = document.getElementById('hp-text');
+    const kdText = document.getElementById('kd-text');
+    const ammoText = document.getElementById('ammo-text');
     const lbEntriesEl = document.getElementById('lb-entries');
+    const killfeedEl = document.getElementById('killfeed');
     const overlay = document.getElementById('overlay');
     const nameInput = document.getElementById('name-input');
     const playBtn = document.getElementById('play-btn');
     nameInput.value = localStorage.getItem('ba_name') || '';
 
-    // pointer lock
-    let pointerLocked = false;
     const canvasEl = renderer.domElement;
+    let pointerLocked = false;
 
     function requestPointerLock() {
       canvasEl.requestPointerLock = canvasEl.requestPointerLock || canvasEl.mozRequestPointerLock;
@@ -163,7 +214,6 @@
       pointerLocked = document.pointerLockElement === canvasEl;
     });
 
-    // input
     const keys = {};
     window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
     window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -180,7 +230,6 @@
       pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
     });
 
-    // entities
     class Player {
       constructor(name, color, isBot = false) {
         this.name = name;
@@ -310,7 +359,7 @@
       }
 
       shoot(angle) {
-        this.shootCooldown = 0.5;
+        this.shootCooldown = 0.25;
         const origin = this.position.clone();
         origin.y += 1.2;
         const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
@@ -337,10 +386,47 @@
         const bot = new Player('Bot' + (i + 1), botColors[i % botColors.length], true);
         players.push(bot);
       }
+
+      setupWeapon();
     }
 
-    // shooting / raycast
     const raycaster = new THREE.Raycaster();
+
+    const tracers = [];
+    const damageTexts = [];
+
+    function addTracer(start, end) {
+      const material = new THREE.LineBasicMaterial({ color: 0xffffaa });
+      const points = [start.clone(), end.clone()];
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geometry, material);
+      scene.add(line);
+      tracers.push({ line, life: 0.06 });
+    }
+
+    function addDamageText(worldPos, amount) {
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.fontSize = '12px';
+      div.style.color = '#ffeb3b';
+      div.style.fontWeight = '600';
+      div.style.textShadow = '0 0 4px #000';
+      div.textContent = '-' + amount;
+      document.body.appendChild(div);
+      damageTexts.push({
+        el: div,
+        pos: worldPos.clone(),
+        life: 0.6,
+        vy: 0.8
+      });
+    }
+
+    function addKillfeed(killer, victim) {
+      const div = document.createElement('div');
+      div.textContent = `${killer.name} → ${victim.name}`;
+      killfeedEl.prepend(div);
+      setTimeout(() => div.remove(), 4000);
+    }
 
     function raycastShot(shooter, origin, dir) {
       const maxDist = 80;
@@ -349,28 +435,83 @@
         .filter(p => p !== shooter && p.health > 0)
         .map(p => p.mesh);
       const hits = raycaster.intersectObjects(meshes, false);
+      let hitPoint = origin.clone().add(dir.clone().multiplyScalar(maxDist));
       if (hits.length > 0 && hits[0].distance <= maxDist) {
         const hitMesh = hits[0].object;
+        hitPoint = hits[0].point.clone();
         const victim = players.find(p => p.mesh === hitMesh);
-        if (!victim) return;
-        const dmg = 40;
-        victim.health -= dmg;
-        if (victim.health <= 0) {
-          shooter.kills++;
-          shooter.score += 10;
-          victim.deaths++;
-          victim.respawn();
+        if (victim) {
+          const dmg = 35;
+          victim.health -= dmg;
+          addDamageText(hitPoint, dmg);
+          if (victim.health <= 0) {
+            shooter.kills++;
+            shooter.score += 10;
+            victim.deaths++;
+            addKillfeed(shooter, victim);
+            victim.respawn();
+          }
         }
       }
+      addTracer(origin, hitPoint);
+      triggerMuzzleFlash();
     }
 
-    // game loop
+    let weaponGroup = null;
+    let muzzleFlash = null;
+    let muzzleFlashTimer = 0;
+
+    function setupWeapon() {
+      if (weaponGroup) {
+        camera.remove(weaponGroup);
+      }
+      weaponGroup = new THREE.Group();
+
+      const bodyGeo = new THREE.BoxGeometry(0.2, 0.2, 0.7);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.3, roughness: 0.4 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.set(0.3, -0.25, -0.6);
+      weaponGroup.add(body);
+
+      const barrelGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.5, 8);
+      const barrelMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
+      const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+      barrel.rotation.z = Math.PI / 2;
+      barrel.position.set(0.45, -0.25, -0.6);
+      weaponGroup.add(barrel);
+
+      const flashGeo = new THREE.ConeGeometry(0.12, 0.3, 8);
+      const flashMat = new THREE.MeshBasicMaterial({ color: 0xfff3a3 });
+      muzzleFlash = new THREE.Mesh(flashGeo, flashMat);
+      muzzleFlash.rotation.z = Math.PI / 2;
+      muzzleFlash.position.set(0.7, -0.25, -0.6);
+      muzzleFlash.visible = false;
+      weaponGroup.add(muzzleFlash);
+
+      camera.add(weaponGroup);
+      scene.add(camera);
+    }
+
+    function triggerMuzzleFlash() {
+      if (!muzzleFlash) return;
+      muzzleFlash.visible = true;
+      muzzleFlashTimer = 0.05;
+    }
+
     let lastTime = 0;
+    let mouseShoot = false;
+
+    document.addEventListener('mousedown', e => {
+      if (!pointerLocked) return;
+      if (e.button === 0) mouseShoot = true;
+    });
+    document.addEventListener('mouseup', e => {
+      if (e.button === 0) mouseShoot = false;
+    });
 
     function update(dt) {
       if (!localPlayer) return;
 
-      // local movement
       let moveX = 0, moveZ = 0;
       if (keys['w']) moveZ -= 1;
       if (keys['s']) moveZ += 1;
@@ -393,32 +534,61 @@
         localPlayer.tryMove(dir.x, dir.z, dt);
       }
 
-      // camera follow
       const camOffset = new THREE.Vector3(0, 3, 0);
       camera.position.copy(localPlayer.position).add(camOffset);
       camera.rotation.set(0, 0, 0);
       camera.rotateY(yaw);
       camera.rotateX(pitch);
 
-      // bots + cooldowns
       for (const p of players) p.update(dt);
 
-      // shooting input
       if (mouseShoot && localPlayer.shootCooldown <= 0) {
         const origin = localPlayer.position.clone();
         origin.y += 1.2;
         const dirVec = new THREE.Vector3(0, 0, -1);
         dirVec.applyEuler(camera.rotation);
         raycastShot(localPlayer, origin, dirVec);
-        localPlayer.shootCooldown = 0.25;
+        localPlayer.shootCooldown = 0.12;
+      }
+
+      if (muzzleFlash) {
+        muzzleFlashTimer -= dt;
+        if (muzzleFlashTimer <= 0) muzzleFlash.visible = false;
+      }
+
+      for (let i = tracers.length - 1; i >= 0; i--) {
+        tracers[i].life -= dt;
+        if (tracers[i].life <= 0) {
+          scene.remove(tracers[i].line);
+          tracers.splice(i, 1);
+        }
+      }
+
+      for (let i = damageTexts.length - 1; i >= 0; i--) {
+        const d = damageTexts[i];
+        d.life -= dt;
+        d.pos.y += d.vy * dt;
+        const v = d.pos.clone().project(camera);
+        const x = (v.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-v.y * 0.5 + 0.5) * window.innerHeight;
+        d.el.style.left = `${x}px`;
+        d.el.style.top = `${y}px`;
+        d.el.style.opacity = (d.life / 0.6).toFixed(2);
+        if (d.life <= 0) {
+          d.el.remove();
+          damageTexts.splice(i, 1);
+        }
       }
 
       updateHUD();
     }
 
     function updateHUD() {
-      statsEl.textContent =
-        `HP: ${Math.max(0, localPlayer.health | 0)} | Kills: ${localPlayer.kills} | Deaths: ${localPlayer.deaths}`;
+      hpText.textContent = `HP: ${Math.max(0, localPlayer.health | 0)}`;
+      const hpRatio = Math.max(0, localPlayer.health / localPlayer.maxHealth);
+      hpBar.style.width = `${hpRatio * 100}%`;
+      kdText.textContent = `K/D: ${localPlayer.kills} / ${localPlayer.deaths}`;
+      ammoText.textContent = 'Rifle · ∞';
 
       const sorted = [...players].sort((a, b) => b.score - a.score).slice(0, 5);
       lbEntriesEl.innerHTML = '';
@@ -429,15 +599,6 @@
         lbEntriesEl.appendChild(div);
       });
     }
-
-    let mouseShoot = false;
-    document.addEventListener('mousedown', e => {
-      if (!pointerLocked) return;
-      if (e.button === 0) mouseShoot = true;
-    });
-    document.addEventListener('mouseup', e => {
-      if (e.button === 0) mouseShoot = false;
-    });
 
     function loop(timestamp) {
       if (!lastTime) lastTime = timestamp;
@@ -451,7 +612,6 @@
 
     requestAnimationFrame(loop);
 
-    // start flow
     playBtn.onclick = () => {
       const name = (nameInput.value.trim() || 'Guest').slice(0, 12);
       localStorage.setItem('ba_name', name);
