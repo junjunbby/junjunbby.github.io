@@ -290,6 +290,12 @@
       color: #ffeb3b;
       font-weight: 600;
     }
+    #space-hint {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 8px;
+      font-style: italic;
+    }
     #death-stats {
       font-size: 12px;
       opacity: 0.8;
@@ -454,6 +460,7 @@
         <div>Score: <span id="death-score">0</span></div>
       </div>
       <button id="respawn-btn" class="death-btn">Respawn (3s)</button>
+      <div id="space-hint">Press SPACE to respawn</div>
       <button id="lobby-btn" class="death-btn">Return to Lobby</button>
     </div>
   </div>
@@ -629,6 +636,13 @@
     // ============================================================================
     const keys = {};
     window.addEventListener('keydown', e => { 
+      // Handle space key for respawn when death screen is active
+      if (e.key === ' ' && isDeathScreenActive && !respawnBtn.disabled) {
+        e.preventDefault();
+        respawnBtn.click();
+        return;
+      }
+      
       keys[e.key.toLowerCase()] = true;
     });
     window.addEventListener('keyup', e => { 
@@ -1065,12 +1079,14 @@
           hitPoint = hits[0].point.clone();
           hitSomething = true;
           
-          const dmg = 35;
+          // Base damage is 35, but bots do 85% less damage (only 5.25 damage)
+          const baseDamage = 35;
+          const dmg = shooter.isBot ? baseDamage * 0.15 : baseDamage;
           victim.health -= dmg;
           
           // Only show damage text if the shooter or victim is the local player
           if (shooter === localPlayer || victim === localPlayer) {
-            addDamageText(hitPoint, dmg);
+            addDamageText(hitPoint, Math.round(dmg));
           }
           
           if (victim.health <= 0) {
@@ -1213,6 +1229,7 @@
     let mouseShoot = false;
     let respawnTimer = 0;
     let respawnTimerInterval = null;
+    let isDeathScreenActive = false;
 
     // Mobile controls state
     let mobileJoystickActive = false;
@@ -1221,6 +1238,7 @@
     let mobileShootActive = false;
 
     function showDeathScreen(killer) {
+      isDeathScreenActive = true;
       deathKillerEl.textContent = killer.name;
       deathKillsEl.textContent = localPlayer.kills;
       deathDeathsEl.textContent = localPlayer.deaths;
@@ -1252,6 +1270,7 @@
     }
 
     function hideDeathScreen() {
+      isDeathScreenActive = false;
       deathScreen.style.display = 'none';
       if (respawnTimerInterval) {
         clearInterval(respawnTimerInterval);
