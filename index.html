@@ -41,6 +41,17 @@
     #hud-line {
       opacity: 0.9;
     }
+    #abilities {
+      margin-top: 4px;
+      font-size: 11px;
+      opacity: 0.85;
+    }
+    .ability-ready {
+      color: #00ff88;
+    }
+    .ability-cooldown {
+      color: #ff5c5c;
+    }
 
     /* Leaderboard */
     #leaderboard {
@@ -246,6 +257,9 @@
       <span id="kd-text">K/D: 0 / 0</span> ·
       <span id="ammo-text">AR · ∞</span>
     </div>
+    <div id="abilities">
+      <span id="dash-text" class="ability-ready">[Q] Dash</span>
+    </div>
   </div>
 
   <!-- Leaderboard -->
@@ -397,6 +411,7 @@
     const hpText = document.getElementById('hp-text');
     const kdText = document.getElementById('kd-text');
     const ammoText = document.getElementById('ammo-text');
+    const dashText = document.getElementById('dash-text');
     const lbEntriesEl = document.getElementById('lb-entries');
     const killfeedEl = document.getElementById('killfeed');
     const loadingScreen = document.getElementById('loading-screen');
@@ -466,6 +481,21 @@
         this.botDecisionTimer = 0;
         this.target = null;
         this.shootCooldown = 0;
+        
+        // Jump and dash mechanics
+        this.velocityY = 0;
+        this.isGrounded = true;
+        this.jumpForce = 12;
+        this.gravity = 35;
+        this.groundY = 0;
+        
+        this.dashCooldown = 0;
+        this.dashMaxCooldown = 3.0;
+        this.dashSpeed = 40;
+        this.dashDuration = 0.2;
+        this.isDashing = false;
+        this.dashTimer = 0;
+        this.dashDirection = new THREE.Vector3();
         
         // Create player mesh with proper scale
         this.mesh = this.createSkin(color);
@@ -574,11 +604,42 @@
           0,
           (Math.random() - 0.5) * 40
         );
+        this.velocityY = 0;
+        this.isGrounded = true;
+        this.isDashing = false;
+        this.dashTimer = 0;
       }
 
       update(dt) {
         if (this.isBot) this.updateBot(dt);
         this.shootCooldown = Math.max(0, this.shootCooldown - dt);
+        this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+        
+        // Apply gravity and jump physics
+        if (!this.isGrounded) {
+          this.velocityY -= this.gravity * dt;
+        }
+        
+        this.position.y += this.velocityY * dt;
+        
+        // Ground collision
+        if (this.position.y <= this.groundY) {
+          this.position.y = this.groundY;
+          this.velocityY = 0;
+          this.isGrounded = true;
+          this.isDashing = false;
+        } else {
+          this.isGrounded = false;
+        }
+        
+        // Dash timer
+        if (this.isDashing) {
+          this.dashTimer -= dt;
+          if (this.dashTimer <= 0) {
+            this.isDashing = false;
+          }
+        }
+        
         this.updateNameLabel();
       }
 
@@ -658,8 +719,19 @@
 
       tryMove(dirX, dirZ, dt, speedOverride = null) {
         const speed = speedOverride ?? this.speed;
-        const nx = dirX * speed * dt;
-        const nz = dirZ * speed * dt;
+        
+        // Use dash speed if dashing
+        const finalSpeed = this.isDashing ? this.dashSpeed : speed;
+        
+        let nx, nz;
+        if (this.isDashing) {
+          // Use stored dash direction
+          nx = this.dashDirection.x * finalSpeed * dt;
+          nz = this.dashDirection.z * finalSpeed * dt;
+        } else {
+          nx = dirX * finalSpeed * dt;
+          nz = dirZ * finalSpeed * dt;
+        }
         
         const newPos = this.position.clone();
         newPos.x += nx;
@@ -680,7 +752,28 @@
           }
         }
 
-        this.position.copy(newPos);
+        this.position.x = newPos.x;
+        this.position.z = newPos.z;
+      }
+
+      jump() {
+        if (this.isGrounded) {
+          this.velocityY = this.jumpForce;
+          this.isGrounded = false;
+        }
+      }
+
+      dash(dirX, dirZ) {
+        if (this.dashCooldown > 0 || this.isDashing) return;
+        
+        // Normalize direction
+        const len = Math.hypot(dirX, dirZ);
+        if (len < 0.1) return; // No dash if not moving
+        
+        this.dashDirection.set(dirX / len, 0, dirZ / len);
+        this.isDashing = true;
+        this.dashTimer = this.dashDuration;
+        this.dashCooldown = this.dashMaxCooldown;
       }
 
       shoot(angle) {
@@ -787,7 +880,11 @@
           
           const dmg = 35;
           victim.health -= dmg;
-          addDamageText(hitPoint, dmg);
+          
+          // Only show damage text if the shooter or victim is the local player
+          if (shooter === localPlayer || victim === localPlayer) {
+            addDamageText(hitPoint, dmg);
+          }
           
           if (victim.health <= 0) {
             shooter.kills++;
@@ -980,6 +1077,14 @@
       if (keys['a']) moveX -= 1;
       if (keys['d']) moveX += 1;
 
+      // Handle jump
+      if (keys[' '] && localPlayer.isGrounded) {
+        localPlayer.jump();
+      }
+
+      // Calculate movement direction for dash
+      let dashDirX = 0, dashDirZ = 0;
+      
       if (moveX !== 0 || moveZ !== 0) {
         const len = Math.hypot(moveX, moveZ);
         moveX /= len;
@@ -995,7 +1100,17 @@
         dir.addScaledVector(right, moveX);
         dir.normalize();
 
+        dashDirX = dir.x;
+        dashDirZ = dir.z;
+
+        // Apply movement (dash overrides in tryMove)
         localPlayer.tryMove(dir.x, dir.z, dt);
+      }
+
+      // Handle dash
+      if (keys['q'] && dashDirX !== 0 && dashDirZ !== 0) {
+        localPlayer.dash(dashDirX, dashDirZ);
+        keys['q'] = false; // Prevent holding
       }
 
       // Camera follow player (adjusted height for smaller player)
@@ -1078,6 +1193,15 @@
 
       // Ammo (infinite)
       ammoText.textContent = 'AR · ∞';
+
+      // Dash cooldown
+      if (localPlayer.dashCooldown > 0) {
+        dashText.textContent = `[Q] Dash (${localPlayer.dashCooldown.toFixed(1)}s)`;
+        dashText.className = 'ability-cooldown';
+      } else {
+        dashText.textContent = '[Q] Dash';
+        dashText.className = 'ability-ready';
+      }
 
       // Leaderboard
       const sorted = [...players]
