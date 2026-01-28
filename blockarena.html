@@ -175,69 +175,373 @@
       opacity: 0.9;
     }
 
-    /* Lobby menu */
+    /* Lobby menu - Fortnite style */
     #lobby {
       position: fixed;
       inset: 0;
       display: flex;
+      background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 50%, #16213e 100%);
+      z-index: 20;
+      overflow: hidden;
+    }
+    
+    /* Left sidebar navigation */
+    #lobby-sidebar {
+      width: 80px;
+      background: rgba(0,0,0,0.6);
+      border-right: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      gap: 20px;
+    }
+    #logo {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffeb3b;
+      margin-bottom: 20px;
+      letter-spacing: 0.1em;
+    }
+    .nav-btn {
+      width: 50px;
+      height: 50px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,0.85);
-      z-index: 20;
+      font-size: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: rgba(255,255,255,0.6);
     }
-    #lobby-inner {
-      background: rgba(10,10,10,0.95);
-      border-radius: 10px;
-      padding: 18px 22px;
-      min-width: 260px;
-      max-width: 320px;
-      border: 1px solid rgba(255,255,255,0.12);
-      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    .nav-btn:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,235,59,0.5);
+      color: #ffeb3b;
+      transform: translateX(5px);
     }
-    #lobby-title {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 4px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+    .nav-btn.active {
+      background: rgba(255,235,59,0.2);
+      border-color: #ffeb3b;
       color: #ffeb3b;
     }
-    #lobby-sub {
-      font-size: 12px;
-      opacity: 0.8;
-      margin-bottom: 12px;
+    
+    /* Main content area */
+    #lobby-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
-    #lobby input {
+    
+    /* Top bar */
+    #lobby-topbar {
+      height: 70px;
+      background: rgba(0,0,0,0.4);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 30px;
+    }
+    #player-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    #player-avatar {
+      width: 45px;
+      height: 45px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    #player-name-display {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+    }
+    #player-level {
+      font-size: 12px;
+      color: #ffeb3b;
+      font-weight: 600;
+    }
+    #currency-bar {
+      display: flex;
+      gap: 20px;
+    }
+    .currency-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.4);
+      padding: 8px 15px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .currency-icon {
+      font-size: 16px;
+    }
+    .currency-amount {
+      font-weight: 600;
+      color: #fff;
+    }
+    
+    /* Content panels */
+    .lobby-panel {
+      display: none;
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+    }
+    .lobby-panel.active {
+      display: block;
+    }
+    
+    /* Play panel */
+    #play-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+    #featured-card {
       width: 100%;
-      padding: 6px 10px;
+      max-width: 800px;
+      height: 400px;
+      background: linear-gradient(135deg, rgba(255,235,59,0.1) 0%, rgba(255,152,0,0.1) 100%);
+      border-radius: 15px;
+      border: 2px solid rgba(255,235,59,0.3);
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+    #featured-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255,235,59,0.2) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .featured-header {
+      position: relative;
+      z-index: 1;
+    }
+    .featured-title {
+      font-size: 48px;
+      font-weight: 800;
+      color: #ffeb3b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 20px rgba(255,235,59,0.5);
+      margin-bottom: 10px;
+    }
+    .featured-subtitle {
+      font-size: 18px;
+      color: rgba(255,255,255,0.8);
+      font-weight: 500;
+    }
+    .featured-footer {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mode-info {
+      display: flex;
+      gap: 20px;
+    }
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .info-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .info-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+    }
+    #big-play-btn {
+      padding: 18px 60px;
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #ffeb3b, #ff9800);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      box-shadow: 0 5px 20px rgba(255,235,59,0.4);
+      transition: all 0.2s;
+    }
+    #big-play-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 25px rgba(255,235,59,0.6);
+    }
+    #customize-section {
+      width: 100%;
+      max-width: 800px;
+      text-align: center;
+    }
+    .section-title {
       font-size: 14px;
-      margin-bottom: 8px;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(0,0,0,0.6);
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 15px;
+    }
+    #name-customize {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    #name-input-new {
+      padding: 12px 20px;
+      font-size: 16px;
+      background: rgba(0,0,0,0.4);
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
       color: #fff;
       outline: none;
-      box-sizing: border-box;
+      width: 250px;
     }
-    #lobby input:focus {
+    #name-input-new:focus {
       border-color: #ffeb3b;
     }
-    #lobby button {
-      width: 100%;
-      padding: 7px 10px;
-      font-size: 14px;
+    #save-name-btn {
+      padding: 12px 25px;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: #fff;
       cursor: pointer;
-      border-radius: 4px;
-      border: none;
-      background: linear-gradient(90deg, #ffeb3b, #ff9800);
-      color: #000;
       font-weight: 600;
+      transition: all 0.2s;
+    }
+    #save-name-btn:hover {
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.4);
+    }
+    
+    /* Coming soon panels */
+    .coming-soon-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      text-align: center;
+    }
+    .coming-soon-icon {
+      font-size: 80px;
+      opacity: 0.3;
+    }
+    .coming-soon-title {
+      font-size: 42px;
+      font-weight: 800;
+      color: rgba(255,255,255,0.9);
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
     }
-    #lobby button:hover {
-      filter: brightness(1.05);
+    .coming-soon-subtitle {
+      font-size: 16px;
+      color: rgba(255,255,255,0.5);
+      max-width: 400px;
     }
+    
+    /* Shop grid */
+    .shop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .shop-item {
+      background: rgba(0,0,0,0.4);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 15px;
+      text-align: center;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .shop-item:hover {
+      border-color: rgba(255,235,59,0.5);
+      transform: translateY(-3px);
+    }
+    .shop-item-img {
+      width: 100%;
+      height: 150px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+    }
+    .shop-item-name {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    .shop-item-price {
+      color: #ffeb3b;
+      font-weight: 700;
+    }
+    
+    @media (max-width: 768px) {
+      #lobby-sidebar {
+        width: 60px;
+        padding: 10px 0;
+        gap: 10px;
+      }
+      .nav-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+      }
+      #logo {
+        font-size: 18px;
+      }
+      #lobby-topbar {
+        padding: 0 15px;
+      }
+      .featured-title {
+        font-size: 32px;
+      }
+      #featured-card {
+        height: 300px;
+        padding: 25px;
+      }
+      #big-play-btn {
+        padding: 15px 40px;
+        font-size: 16px;
+      }
+    }
+
     #lobby-meta {
       margin-top: 8px;
       font-size: 11px;
@@ -435,14 +739,133 @@
 
   <!-- Lobby -->
   <div id="lobby" style="display:none;">
-    <div id="lobby-inner">
-      <div id="lobby-title">BlockArena</div>
-      <div id="lobby-sub">Fast‑paced hitscan arena. No login, just play.</div>
-      <input id="name-input" placeholder="Your name" maxlength="12" />
-      <button id="play-btn">Play</button>
-      <div id="lobby-meta">
-        <span>Mode: FFA</span>
-        <span>Bots: 7</span>
+    <!-- Sidebar Navigation -->
+    <div id="lobby-sidebar">
+      <div id="logo">BA</div>
+      <div class="nav-btn active" data-panel="play" title="Play">▶</div>
+      <div class="nav-btn" data-panel="battlepass" title="Battle Pass">⭐</div>
+      <div class="nav-btn" data-panel="quests" title="Quests">📋</div>
+      <div class="nav-btn" data-panel="shop" title="Shop">🛒</div>
+      <div class="nav-btn" data-panel="locker" title="Locker">👤</div>
+      <div class="nav-btn" data-panel="settings" title="Settings">⚙</div>
+    </div>
+    
+    <!-- Main Content -->
+    <div id="lobby-main">
+      <!-- Top Bar -->
+      <div id="lobby-topbar">
+        <div id="player-info">
+          <div id="player-avatar">?</div>
+          <div>
+            <div id="player-name-display">Guest</div>
+            <div id="player-level">Level 1</div>
+          </div>
+        </div>
+        <div id="currency-bar">
+          <div class="currency-item">
+            <span class="currency-icon">⭐</span>
+            <span class="currency-amount">0</span>
+          </div>
+          <div class="currency-item">
+            <span class="currency-icon">💎</span>
+            <span class="currency-amount">0</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Play Panel -->
+      <div id="play-panel" class="lobby-panel active">
+        <div id="featured-card">
+          <div class="featured-header">
+            <div class="featured-title">BlockArena</div>
+            <div class="featured-subtitle">Fast-paced tactical FPS action</div>
+          </div>
+          <div class="featured-footer">
+            <div class="mode-info">
+              <div class="info-item">
+                <div class="info-label">Mode</div>
+                <div class="info-value">Free For All</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Players</div>
+                <div class="info-value">1 + 7 Bots</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Map</div>
+                <div class="info-value">Arena</div>
+              </div>
+            </div>
+            <button id="big-play-btn">Play Now</button>
+          </div>
+        </div>
+        
+        <div id="customize-section">
+          <div class="section-title">Customize Your Name</div>
+          <div id="name-customize">
+            <input id="name-input-new" placeholder="Enter your name" maxlength="12" />
+            <button id="save-name-btn">Save</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Battle Pass Panel -->
+      <div id="battlepass-panel" class="lobby-panel coming-soon-panel">
+        <div class="coming-soon-icon">⭐</div>
+        <div class="coming-soon-title">Battle Pass</div>
+        <div class="coming-soon-subtitle">
+          Unlock exclusive rewards, skins, and items. Complete challenges to level up!
+        </div>
+        <div style="margin-top: 30px; padding: 20px 40px; background: rgba(255,235,59,0.1); border: 2px solid rgba(255,235,59,0.3); border-radius: 10px;">
+          <div style="font-size: 24px; font-weight: 700; color: #ffeb3b;">COMING SOON</div>
+        </div>
+      </div>
+      
+      <!-- Quests Panel -->
+      <div id="quests-panel" class="lobby-panel coming-soon-panel">
+        <div class="coming-soon-icon">📋</div>
+        <div class="coming-soon-title">Quests</div>
+        <div class="coming-soon-subtitle">
+          Daily and weekly challenges to earn XP, rewards, and climb the ranks!
+        </div>
+        <div style="margin-top: 30px; padding: 20px 40px; background: rgba(0,196,255,0.1); border: 2px solid rgba(0,196,255,0.3); border-radius: 10px;">
+          <div style="font-size: 24px; font-weight: 700; color: #00c4ff;">COMING SOON</div>
+        </div>
+      </div>
+      
+      <!-- Shop Panel -->
+      <div id="shop-panel" class="lobby-panel coming-soon-panel">
+        <div class="coming-soon-icon">🛒</div>
+        <div class="coming-soon-title">Item Shop</div>
+        <div class="coming-soon-subtitle">
+          Browse and purchase exclusive skins, emotes, weapons, and more!
+        </div>
+        <div style="margin-top: 30px; padding: 20px 40px; background: rgba(255,92,92,0.1); border: 2px solid rgba(255,92,92,0.3); border-radius: 10px;">
+          <div style="font-size: 24px; font-weight: 700; color: #ff5c5c;">COMING SOON</div>
+        </div>
+      </div>
+      
+      <!-- Locker Panel -->
+      <div id="locker-panel" class="lobby-panel coming-soon-panel">
+        <div class="coming-soon-icon">👤</div>
+        <div class="coming-soon-title">Locker</div>
+        <div class="coming-soon-subtitle">
+          Customize your character with skins, back bling, pickaxes, and emotes!
+        </div>
+        <div style="margin-top: 30px; padding: 20px 40px; background: rgba(155,93,229,0.1); border: 2px solid rgba(155,93,229,0.3); border-radius: 10px;">
+          <div style="font-size: 24px; font-weight: 700; color: #9b5de5;">COMING SOON</div>
+        </div>
+      </div>
+      
+      <!-- Settings Panel -->
+      <div id="settings-panel" class="lobby-panel coming-soon-panel">
+        <div class="coming-soon-icon">⚙</div>
+        <div class="coming-soon-title">Settings</div>
+        <div class="coming-soon-subtitle">
+          Adjust graphics, controls, audio, and gameplay settings to your preference!
+        </div>
+        <div style="margin-top: 30px; padding: 20px 40px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); border-radius: 10px;">
+          <div style="font-size: 24px; font-weight: 700; color: #fff;">COMING SOON</div>
+        </div>
       </div>
     </div>
   </div>
@@ -595,8 +1018,11 @@
     const loadingBar = document.getElementById('loading-bar');
     const loadingPercent = document.getElementById('loading-percent');
     const lobby = document.getElementById('lobby');
-    const nameInput = document.getElementById('name-input');
-    const playBtn = document.getElementById('play-btn');
+    const nameInputNew = document.getElementById('name-input-new');
+    const saveNameBtn = document.getElementById('save-name-btn');
+    const bigPlayBtn = document.getElementById('big-play-btn');
+    const playerNameDisplay = document.getElementById('player-name-display');
+    const playerAvatar = document.getElementById('player-avatar');
     const deathScreen = document.getElementById('death-screen');
     const deathKillerEl = document.getElementById('death-killer');
     const deathKillsEl = document.getElementById('death-kills');
@@ -608,7 +1034,12 @@
     const mobileShoot = document.getElementById('mobile-shoot');
     const mobileJump = document.getElementById('mobile-jump');
     const mobileDash = document.getElementById('mobile-dash');
-    nameInput.value = localStorage.getItem('ba_name') || '';
+    
+    // Load saved name
+    const savedName = localStorage.getItem('ba_name') || 'Guest';
+    nameInputNew.value = savedName;
+    playerNameDisplay.textContent = savedName;
+    playerAvatar.textContent = savedName.charAt(0).toUpperCase();
 
     // ============================================================================
     // POINTER LOCK
@@ -1561,20 +1992,57 @@
       loadingPercent.textContent = Math.round(loadProgress) + '%';
     }, 150);
 
-    // Lobby play button
-    playBtn.onclick = () => {
-      const name = (nameInput.value.trim() || 'Guest').slice(0, 12);
+    // ============================================================================
+    // LOBBY NAVIGATION
+    // ============================================================================
+    const navBtns = document.querySelectorAll('.nav-btn');
+    const lobbyPanels = document.querySelectorAll('.lobby-panel');
+    
+    navBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const panelName = btn.getAttribute('data-panel');
+        
+        // Update active nav button
+        navBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update active panel
+        lobbyPanels.forEach(p => p.classList.remove('active'));
+        const targetPanel = document.getElementById(`${panelName}-panel`);
+        if (targetPanel) {
+          targetPanel.classList.add('active');
+        }
+      });
+    });
+
+    // Save name button
+    saveNameBtn.addEventListener('click', () => {
+      const name = (nameInputNew.value.trim() || 'Guest').slice(0, 12);
+      localStorage.setItem('ba_name', name);
+      playerNameDisplay.textContent = name;
+      playerAvatar.textContent = name.charAt(0).toUpperCase();
+      
+      // Visual feedback
+      saveNameBtn.textContent = 'Saved!';
+      setTimeout(() => {
+        saveNameBtn.textContent = 'Save';
+      }, 1000);
+    });
+
+    // Play button
+    bigPlayBtn.addEventListener('click', () => {
+      const name = (nameInputNew.value.trim() || 'Guest').slice(0, 12);
       localStorage.setItem('ba_name', name);
       lobby.style.display = 'none';
       gameStarted = true;
       createPlayers(name);
       requestPointerLock();
-    };
+    });
 
     // Allow Enter key in name input
-    nameInput.addEventListener('keypress', (e) => {
+    nameInputNew.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
-        playBtn.click();
+        bigPlayBtn.click();
       }
     });
 
