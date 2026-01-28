@@ -2,24 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>DashDome.io (Single File)</title>
+  <title>BlockArena 3D</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      background: #111;
       overflow: hidden;
+      background: #000;
       font-family: system-ui, sans-serif;
       color: #fff;
     }
-    #ui {
+    #hud {
       position: fixed;
       top: 8px;
       left: 8px;
       z-index: 10;
       font-size: 14px;
       pointer-events: none;
+      text-shadow: 0 0 4px #000;
     }
     #leaderboard {
       position: fixed;
@@ -29,23 +30,37 @@
       font-size: 14px;
       text-align: right;
       pointer-events: none;
+      text-shadow: 0 0 4px #000;
     }
-    #name-input-wrapper {
+    #center-dot {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 4px;
+      height: 4px;
+      margin-left: -2px;
+      margin-top: -2px;
+      background: #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #overlay {
       position: fixed;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,0.8);
-      z-index: 20;
       flex-direction: column;
       gap: 8px;
+      background: rgba(0,0,0,0.85);
+      z-index: 20;
     }
-    #name-input-wrapper input {
+    #overlay input {
       padding: 6px 10px;
       font-size: 16px;
     }
-    #name-input-wrapper button {
+    #overlay button {
       padding: 6px 14px;
       font-size: 16px;
       cursor: pointer;
@@ -53,195 +68,206 @@
   </style>
 </head>
 <body>
-  <canvas id="game"></canvas>
-
-  <div id="ui">
-    <div id="stats">Power: 1 | Kills: 0 | Deaths: 0</div>
-    <div>Move: WASD / Arrows — Dash: Space</div>
+  <div id="hud">
+    <div id="stats">HP: 100 | Kills: 0 | Deaths: 0</div>
+    <div>WASD to move, mouse to aim, click to shoot</div>
   </div>
-
   <div id="leaderboard">
     <div><strong>Leaderboard</strong></div>
     <div id="lb-entries"></div>
   </div>
+  <div id="center-dot"></div>
 
-  <div id="name-input-wrapper">
-    <h1>DashDome.io</h1>
-    <p>Enter a name and jump in instantly.</p>
-    <input id="player-name" placeholder="Your name" maxlength="12" />
-    <button id="play-btn">Play</button>
+  <div id="overlay">
+    <h1>BlockArena 3D</h1>
+    <p>Fast‑paced FPS arena. No login, just play.</p>
+    <input id="name-input" placeholder="Your name" maxlength="12" />
+    <button id="play-btn">Click to Play</button>
+    <small>Game will capture your mouse (Pointer Lock).</small>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
   <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    let width = window.innerWidth;
-    let height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
+    // basic three.js setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
     window.addEventListener('resize', () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = width;
-      canvas.height = height;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+    // lights
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 0.9);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+    dir.position.set(10, 20, 10);
+    scene.add(dir);
+
+    // arena floor + walls
+    const floorGeo = new THREE.PlaneGeometry(80, 80);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const wallGeo = new THREE.BoxGeometry(80, 8, 1);
+    const wall1 = new THREE.Mesh(wallGeo, wallMat);
+    wall1.position.set(0, 4, -40);
+    const wall2 = wall1.clone(); wall2.position.set(0, 4, 40);
+    const wall3 = new THREE.Mesh(new THREE.BoxGeometry(1, 8, 80), wallMat);
+    wall3.position.set(-40, 4, 0);
+    const wall4 = wall3.clone(); wall4.position.set(40, 4, 0);
+    scene.add(wall1, wall2, wall3, wall4);
+
+    // some obstacles
+    const boxGeo = new THREE.BoxGeometry(6, 6, 6);
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+    const obstacles = [];
+    for (let i = 0; i < 6; i++) {
+      const box = new THREE.Mesh(boxGeo, boxMat);
+      box.position.set(
+        (Math.random() - 0.5) * 50,
+        3,
+        (Math.random() - 0.5) * 50
+      );
+      scene.add(box);
+      obstacles.push(box);
+    }
+
+    // HUD
+    const statsEl = document.getElementById('stats');
+    const lbEntriesEl = document.getElementById('lb-entries');
+    const overlay = document.getElementById('overlay');
+    const nameInput = document.getElementById('name-input');
+    const playBtn = document.getElementById('play-btn');
+    nameInput.value = localStorage.getItem('ba_name') || '';
+
+    // pointer lock
+    let pointerLocked = false;
+    const canvasEl = renderer.domElement;
+
+    function requestPointerLock() {
+      canvasEl.requestPointerLock = canvasEl.requestPointerLock || canvasEl.mozRequestPointerLock;
+      canvasEl.requestPointerLock();
+    }
+
+    document.addEventListener('pointerlockchange', () => {
+      pointerLocked = document.pointerLockElement === canvasEl;
+    });
+
+    // input
     const keys = {};
     window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
     window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
-    const statsEl = document.getElementById('stats');
-    const lbEntriesEl = document.getElementById('lb-entries');
-    const nameWrapper = document.getElementById('name-input-wrapper');
-    const nameInput = document.getElementById('player-name');
-    const playBtn = document.getElementById('play-btn');
+    let yaw = 0;
+    let pitch = 0;
 
-    nameInput.value = localStorage.getItem('dd_name') || '';
+    document.addEventListener('mousemove', e => {
+      if (!pointerLocked) return;
+      const sensitivity = 0.0025;
+      yaw -= e.movementX * sensitivity;
+      pitch -= e.movementY * sensitivity;
+      const maxPitch = Math.PI / 2 - 0.1;
+      pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+    });
 
-    let playerName = 'You';
-
-    playBtn.onclick = () => {
-      playerName = (nameInput.value.trim() || 'Guest').slice(0, 12);
-      localStorage.setItem('dd_name', playerName);
-      nameWrapper.style.display = 'none';
-      resetGame();
-    };
-
-    class Entity {
-      constructor(x, y, radius, color) {
-        this.x = x;
-        this.y = y;
-        this.vx = 0;
-        this.vy = 0;
-        this.radius = radius;
-        this.color = color;
-      }
-      update(dt) {
-        this.x += this.vx * dt;
-        this.y += this.vy * dt;
-      }
-      draw() {
-        ctx.beginPath();
-        ctx.fillStyle = this.color;
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    class Player extends Entity {
-      constructor(x, y, name, color, isBot = false) {
-        super(x, y, 14, color);
+    // entities
+    class Player {
+      constructor(name, color, isBot = false) {
         this.name = name;
+        this.color = color;
         this.isBot = isBot;
-        this.baseSpeed = 220;
-        this.power = 1;
-        this.maxPower = 12;
         this.health = 100;
         this.maxHealth = 100;
-        this.score = 0;
         this.kills = 0;
         this.deaths = 0;
-        this.isDashing = false;
-        this.dashCooldown = 1.4;
-        this.dashTimer = 0;
-        this.dashDuration = 0.12;
-        this.dashTimeLeft = 0;
-        this.lastHitBy = null;
-        this.target = null;
+        this.score = 0;
+        this.speed = 18;
         this.botDecisionTimer = 0;
+        this.target = null;
+        this.shootCooldown = 0;
+        this.mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(1, 2, 1),
+          new THREE.MeshStandardMaterial({ color })
+        );
+        this.mesh.position.set(
+          (Math.random() - 0.5) * 40,
+          1,
+          (Math.random() - 0.5) * 40
+        );
+        scene.add(this.mesh);
+
+        const nameDiv = document.createElement('div');
+        nameDiv.style.position = 'absolute';
+        nameDiv.style.fontSize = '11px';
+        nameDiv.style.color = '#fff';
+        nameDiv.style.textShadow = '0 0 3px #000';
+        nameDiv.textContent = name;
+        document.body.appendChild(nameDiv);
+        this.nameLabel = nameDiv;
       }
 
-      radiusWithPower() {
-        return this.radius + this.power * 0.8;
+      get position() {
+        return this.mesh.position;
+      }
+
+      respawn() {
+        this.health = this.maxHealth;
+        this.mesh.position.set(
+          (Math.random() - 0.5) * 40,
+          1,
+          (Math.random() - 0.5) * 40
+        );
       }
 
       update(dt) {
-        if (this.isBot) this.botAI(dt);
-
-        if (!this.isDashing) {
-          this.x += this.vx * dt;
-          this.y += this.vy * dt;
-        } else {
-          this.x += this.vx * dt;
-          this.y += this.vy * dt;
-          this.dashTimeLeft -= dt;
-          if (this.dashTimeLeft <= 0) {
-            this.isDashing = false;
-          }
-        }
-
-        this.dashTimer -= dt;
-        this.x = Math.max(40, Math.min(width - 40, this.x));
-        this.y = Math.max(40, Math.min(height - 40, this.y));
+        if (this.isBot) this.updateBot(dt);
+        this.shootCooldown -= dt;
+        this.updateNameLabel();
       }
 
-      draw() {
-        const r = this.radiusWithPower();
-        ctx.beginPath();
-        ctx.fillStyle = this.color;
-        ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#ffffff';
-        ctx.stroke();
-
-        // health bar
-        const hw = r * 1.4;
-        const hh = 4;
-        const hx = this.x - hw / 2;
-        const hy = this.y - r - 14;
-        ctx.fillStyle = '#000000aa';
-        ctx.fillRect(hx, hy, hw, hh);
-        const ratio = this.health / this.maxHealth;
-        ctx.fillStyle = '#00ff88';
-        ctx.fillRect(hx, hy, hw * ratio, hh);
-
-        // name
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '12px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText(this.name, this.x, hy - 4);
+      updateNameLabel() {
+        const vector = new THREE.Vector3();
+        vector.copy(this.mesh.position);
+        vector.y += 2.4;
+        vector.project(camera);
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+        this.nameLabel.style.left = `${x - 20}px`;
+        this.nameLabel.style.top = `${y - 20}px`;
+        this.nameLabel.style.display = (vector.z < 1) ? 'block' : 'none';
       }
 
-      tryDash(dirX, dirY) {
-        if (this.dashTimer > 0 || (dirX === 0 && dirY === 0)) return;
-        this.isDashing = true;
-        this.dashTimer = this.dashCooldown;
-        this.dashTimeLeft = this.dashDuration;
-        const len = Math.hypot(dirX, dirY) || 1;
-        const nx = dirX / len;
-        const ny = dirY / len;
-        const dashSpeed = 520 + this.power * 12;
-        this.vx = nx * dashSpeed;
-        this.vy = ny * dashSpeed;
-      }
-
-      botAI(dt) {
+      updateBot(dt) {
         this.botDecisionTimer -= dt;
         if (this.botDecisionTimer <= 0) {
           this.botDecisionTimer = 0.4 + Math.random() * 0.6;
           this.pickTarget();
         }
+        if (!this.target) return;
+        const dx = this.target.position.x - this.position.x;
+        const dz = this.target.position.z - this.position.z;
+        const dist = Math.hypot(dx, dz);
+        const dirX = dx / (dist || 1);
+        const dirZ = dz / (dist || 1);
 
-        let dirX = 0, dirY = 0;
-        if (this.target) {
-          const dx = this.target.x - this.x;
-          const dy = this.target.y - this.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist > 10) {
-            dirX = dx / dist;
-            dirY = dy / dist;
-          }
-          if (dist < 220 && this.dashTimer <= 0) {
-            this.tryDash(dirX, dirY);
-          }
-        }
+        const moveSpeed = this.speed * (dist > 6 ? 1 : 0);
+        this.tryMove(dirX, dirZ, dt, moveSpeed);
 
-        if (!this.isDashing) {
-          const speed = this.baseSpeed + this.power * 6;
-          this.vx = dirX * speed;
-          this.vy = dirY * speed;
+        const angle = Math.atan2(dx, dz);
+        this.mesh.rotation.y = angle;
+
+        if (dist < 35 && this.shootCooldown <= 0) {
+          this.shoot(angle);
         }
       }
 
@@ -250,9 +276,9 @@
         let bestDist = Infinity;
         for (const p of players) {
           if (p === this) continue;
-          const dx = p.x - this.x;
-          const dy = p.y - this.y;
-          const d = Math.hypot(dx, dy);
+          const dx = p.position.x - this.position.x;
+          const dz = p.position.z - this.position.z;
+          const d = Math.hypot(dx, dz);
           if (d < bestDist) {
             bestDist = d;
             best = p;
@@ -260,188 +286,140 @@
         }
         this.target = best;
       }
+
+      tryMove(dirX, dirZ, dt, speedOverride = null) {
+        const speed = speedOverride ?? this.speed;
+        const nx = dirX * speed * dt;
+        const nz = dirZ * speed * dt;
+        const newPos = this.position.clone();
+        newPos.x += nx;
+        newPos.z += nz;
+
+        if (Math.abs(newPos.x) > 38 || Math.abs(newPos.z) > 38) return;
+
+        for (const box of obstacles) {
+          const b = box.position;
+          const half = 3.5;
+          if (newPos.x > b.x - half && newPos.x < b.x + half &&
+              newPos.z > b.z - half && newPos.z < b.z + half) {
+            return;
+          }
+        }
+
+        this.position.copy(newPos);
+      }
+
+      shoot(angle) {
+        this.shootCooldown = 0.5;
+        const origin = this.position.clone();
+        origin.y += 1.2;
+        const dir = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+        raycastShot(this, origin, dir);
+      }
+
+      destroy() {
+        scene.remove(this.mesh);
+        this.nameLabel.remove();
+      }
     }
 
-    class Orb extends Entity {
-      constructor(x, y) {
-        super(x, y, 5, '#ffcc00');
-      }
-    }
-
-    class Hazard {
-      constructor(x, y, w, h, phaseOffset = 0) {
-        this.x = x;
-        this.y = y;
-        this.w = w;
-        this.h = h;
-        this.phaseOffset = phaseOffset;
-      }
-      isActive(time) {
-        const t = (time + this.phaseOffset) % 4;
-        return t > 1.5 && t < 3.2;
-      }
-      draw(time) {
-        const active = this.isActive(time);
-        ctx.fillStyle = active ? 'rgba(255,60,60,0.6)' : 'rgba(255,60,60,0.25)';
-        ctx.fillRect(this.x - this.w / 2, this.y - this.h / 2, this.w, this.h);
-      }
-    }
-
-    let players = [];
-    let orbs = [];
-    let hazards = [];
+    const players = [];
     let localPlayer = null;
-    let lastTime = 0;
 
-    function resetGame() {
-      players = [];
-      orbs = [];
-      hazards = [];
-
-      localPlayer = new Player(width / 2, height / 2, playerName, '#00e0ff', false);
+    function createPlayers(playerName) {
+      players.length = 0;
+      if (localPlayer) localPlayer.destroy();
+      localPlayer = new Player(playerName, 0x00e0ff, false);
       players.push(localPlayer);
 
-      const botColors = ['#ff5c5c', '#ff9f1c', '#2ec4b6', '#e71d36', '#9b5de5', '#f15bb5'];
+      const botColors = [0xff5c5c, 0xff9f1c, 0x2ec4b6, 0xe71d36, 0x9b5de5, 0xf15bb5];
       for (let i = 0; i < 7; i++) {
-        const x = 80 + Math.random() * (width - 160);
-        const y = 80 + Math.random() * (height - 160);
-        const bot = new Player(x, y, 'Bot' + (i + 1), botColors[i % botColors.length], true);
+        const bot = new Player('Bot' + (i + 1), botColors[i % botColors.length], true);
         players.push(bot);
       }
-
-      for (let i = 0; i < 60; i++) spawnOrb();
-
-      hazards.push(new Hazard(width / 2, height / 2, 220, 120, 0));
-      hazards.push(new Hazard(width / 3, height / 3, 140, 80, 1.3));
-      hazards.push(new Hazard((2 * width) / 3, (2 * height) / 3, 140, 80, 2.1));
     }
 
-    function spawnOrb() {
-      const x = 60 + Math.random() * (width - 120);
-      const y = 60 + Math.random() * (height - 120);
-      orbs.push(new Orb(x, y));
+    // shooting / raycast
+    const raycaster = new THREE.Raycaster();
+
+    function raycastShot(shooter, origin, dir) {
+      const maxDist = 80;
+      raycaster.set(origin, dir);
+      const meshes = players
+        .filter(p => p !== shooter && p.health > 0)
+        .map(p => p.mesh);
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length > 0 && hits[0].distance <= maxDist) {
+        const hitMesh = hits[0].object;
+        const victim = players.find(p => p.mesh === hitMesh);
+        if (!victim) return;
+        const dmg = 40;
+        victim.health -= dmg;
+        if (victim.health <= 0) {
+          shooter.kills++;
+          shooter.score += 10;
+          victim.deaths++;
+          victim.respawn();
+        }
+      }
     }
 
-    function handleInput(dt) {
+    // game loop
+    let lastTime = 0;
+
+    function update(dt) {
       if (!localPlayer) return;
-      let dirX = 0, dirY = 0;
-      if (keys['w'] || keys['arrowup']) dirY -= 1;
-      if (keys['s'] || keys['arrowdown']) dirY += 1;
-      if (keys['a'] || keys['arrowleft']) dirX -= 1;
-      if (keys['d'] || keys['arrowright']) dirX += 1;
 
-      const len = Math.hypot(dirX, dirY) || 1;
-      dirX /= len;
-      dirY /= len;
+      // local movement
+      let moveX = 0, moveZ = 0;
+      if (keys['w']) moveZ -= 1;
+      if (keys['s']) moveZ += 1;
+      if (keys['a']) moveX -= 1;
+      if (keys['d']) moveX += 1;
 
-      if (!localPlayer.isDashing) {
-        const speed = localPlayer.baseSpeed + localPlayer.power * 6;
-        localPlayer.vx = dirX * speed;
-        localPlayer.vy = dirY * speed;
+      const len = Math.hypot(moveX, moveZ) || 1;
+      moveX /= len;
+      moveZ /= len;
+
+      const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).negate();
+
+      const dir = new THREE.Vector3();
+      dir.addScaledVector(forward, moveZ);
+      dir.addScaledVector(right, moveX);
+
+      if (dir.lengthSq() > 0) {
+        dir.normalize();
+        localPlayer.tryMove(dir.x, dir.z, dt);
       }
 
-      if (keys[' '] && !localPlayer.isDashing && localPlayer.dashTimer <= 0) {
-        localPlayer.tryDash(dirX, dirY);
-      }
-    }
+      // camera follow
+      const camOffset = new THREE.Vector3(0, 3, 0);
+      camera.position.copy(localPlayer.position).add(camOffset);
+      camera.rotation.set(0, 0, 0);
+      camera.rotateY(yaw);
+      camera.rotateX(pitch);
 
-    function circleCollide(a, b) {
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const r = (a.radiusWithPower ? a.radiusWithPower() : a.radius) +
-                (b.radiusWithPower ? b.radiusWithPower() : b.radius);
-      return dx * dx + dy * dy <= r * r;
-    }
-
-    function update(dt, time) {
-      handleInput(dt);
-
+      // bots + cooldowns
       for (const p of players) p.update(dt);
 
-      // orbs
-      for (let i = orbs.length - 1; i >= 0; i--) {
-        const orb = orbs[i];
-        for (const p of players) {
-          const dx = p.x - orb.x;
-          const dy = p.y - orb.y;
-          const r = (p.radiusWithPower ? p.radiusWithPower() : p.radius) + orb.radius;
-          if (dx * dx + dy * dy <= r * r) {
-            p.power = Math.min(p.maxPower, p.power + 1);
-            if (!p.isBot && p === localPlayer) {
-              localPlayer.score += 1;
-            }
-            orbs.splice(i, 1);
-            spawnOrb();
-            break;
-          }
-        }
+      // shooting input
+      if (mouseShoot && localPlayer.shootCooldown <= 0) {
+        const origin = localPlayer.position.clone();
+        origin.y += 1.2;
+        const dirVec = new THREE.Vector3(0, 0, -1);
+        dirVec.applyEuler(camera.rotation);
+        raycastShot(localPlayer, origin, dirVec);
+        localPlayer.shootCooldown = 0.25;
       }
 
-      // hazards
-      for (const h of hazards) {
-        const active = h.isActive(time);
-        if (!active) continue;
-        for (const p of players) {
-          if (p.health <= 0) continue;
-          if (p.x > h.x - h.w / 2 && p.x < h.x + h.w / 2 &&
-              p.y > h.y - h.h / 2 && p.y < h.y + h.h / 2) {
-            p.health -= 25 * dt;
-            if (p.health <= 0) {
-              p.deaths++;
-              if (p === localPlayer) {
-                respawn(p);
-              } else {
-                respawn(p);
-              }
-            }
-          }
-        }
-      }
-
-      // dash combat
-      for (let i = 0; i < players.length; i++) {
-        const a = players[i];
-        if (!a.isDashing) continue;
-        for (let j = 0; j < players.length; j++) {
-          if (i === j) continue;
-          const b = players[j];
-          if (b.health <= 0) continue;
-          if (circleCollide(a, b)) {
-            const dmg = 40 + a.power * 6;
-            b.health -= dmg * dt * 10;
-            b.lastHitBy = a;
-            if (b.health <= 0) {
-              a.kills++;
-              a.score += 10 + b.power;
-              b.deaths++;
-              respawn(b);
-            }
-          }
-        }
-      }
-
-      updateStats();
-      updateLeaderboard();
+      updateHUD();
     }
 
-    function respawn(p) {
-      p.health = p.maxHealth;
-      p.power = 1;
-      p.x = 80 + Math.random() * (width - 160);
-      p.y = 80 + Math.random() * (height - 160);
-      p.vx = 0;
-      p.vy = 0;
-      p.isDashing = false;
-      p.dashTimer = 0.8;
-    }
-
-    function updateStats() {
-      if (!localPlayer) return;
+    function updateHUD() {
       statsEl.textContent =
-        `Power: ${localPlayer.power} | Kills: ${localPlayer.kills} | Deaths: ${localPlayer.deaths}`;
-    }
+        `HP: ${Math.max(0, localPlayer.health | 0)} | Kills: ${localPlayer.kills} | Deaths: ${localPlayer.deaths}`;
 
-    function updateLeaderboard() {
       const sorted = [...players].sort((a, b) => b.score - a.score).slice(0, 5);
       lbEntriesEl.innerHTML = '';
       sorted.forEach((p, i) => {
@@ -452,36 +430,35 @@
       });
     }
 
-    function draw(time) {
-      ctx.clearRect(0, 0, width, height);
-
-      // arena bounds
-      ctx.strokeStyle = '#333';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(40, 40, width - 80, height - 80);
-
-      for (const h of hazards) h.draw(time);
-
-      for (const o of orbs) o.draw();
-      for (const p of players) p.draw();
-    }
+    let mouseShoot = false;
+    document.addEventListener('mousedown', e => {
+      if (!pointerLocked) return;
+      if (e.button === 0) mouseShoot = true;
+    });
+    document.addEventListener('mouseup', e => {
+      if (e.button === 0) mouseShoot = false;
+    });
 
     function loop(timestamp) {
       if (!lastTime) lastTime = timestamp;
       const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
       lastTime = timestamp;
 
-      if (localPlayer) {
-        update(dt, timestamp / 1000);
-        draw(timestamp / 1000);
-      } else {
-        ctx.clearRect(0, 0, width, height);
-      }
-
+      update(dt);
+      renderer.render(scene, camera);
       requestAnimationFrame(loop);
     }
 
     requestAnimationFrame(loop);
+
+    // start flow
+    playBtn.onclick = () => {
+      const name = (nameInput.value.trim() || 'Guest').slice(0, 12);
+      localStorage.setItem('ba_name', name);
+      overlay.style.display = 'none';
+      createPlayers(name);
+      requestPointerLock();
+    };
   </script>
 </body>
 </html>
