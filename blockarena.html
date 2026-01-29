@@ -175,79 +175,402 @@
       opacity: 0.9;
     }
 
-    /* Lobby menu - Simplified two-tab design */
+    /* Lobby menu - MVP Fortnite Style */
     #lobby {
       position: fixed;
       inset: 0;
       display: flex;
-      flex-direction: column;
       background: linear-gradient(135deg, #0a0e27 0%, #1a1a2e 50%, #16213e 100%);
       z-index: 20;
       overflow: hidden;
     }
     
-    /* Top navigation tabs */
-    #lobby-tabs {
-      height: 60px;
+    /* Left sidebar with vertical tabs */
+    #lobby-sidebar {
+      width: 200px;
       background: rgba(0,0,0,0.6);
-      border-bottom: 2px solid rgba(255,255,255,0.1);
+      border-right: 1px solid rgba(255,255,255,0.1);
       display: flex;
-      align-items: center;
-      padding: 0 30px;
-      gap: 10px;
+      flex-direction: column;
+      padding: 20px 0;
     }
     #logo {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 800;
       color: #ffeb3b;
-      margin-right: 30px;
+      margin: 0 20px 30px;
       letter-spacing: 0.1em;
+      text-align: center;
     }
-    .tab-btn {
-      padding: 10px 30px;
-      background: transparent;
-      border: none;
+    .sidebar-tab {
+      padding: 15px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
       color: rgba(255,255,255,0.6);
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      border-bottom: 3px solid transparent;
+      border-left: 3px solid transparent;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    .tab-btn:hover {
+    .sidebar-tab-icon {
+      font-size: 20px;
+      width: 24px;
+      text-align: center;
+    }
+    .sidebar-tab:hover {
+      background: rgba(255,255,255,0.05);
       color: rgba(255,255,255,0.9);
     }
-    .tab-btn.active {
+    .sidebar-tab.active {
+      background: rgba(255,235,59,0.1);
       color: #ffeb3b;
-      border-bottom-color: #ffeb3b;
+      border-left-color: #ffeb3b;
     }
     
-    /* Main content area */
-    #lobby-main {
+    /* Main content wrapper */
+    #lobby-content-wrapper {
       flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
     
-    /* Top bar */
-    #lobby-topbar {
-      height: 70px;
+    /* Right player card */
+    #player-card {
+      width: 280px;
+      background: rgba(0,0,0,0.5);
+      border-left: 1px solid rgba(255,255,255,0.1);
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    #player-card-header {
+      text-align: center;
+    }
+    #player-avatar-large {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      font-weight: 700;
+      border: 3px solid rgba(255,255,255,0.2);
+      margin: 0 auto 15px;
+    }
+    #player-name-card {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 5px;
+    }
+    #player-level-card {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffeb3b;
+    }
+    .player-stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 15px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .player-stat-label {
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .player-stat-value {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+    #edit-name-btn {
+      width: 100%;
+      padding: 10px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+    }
+    #edit-name-btn:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    
+    /* Content panels */
+    .lobby-panel {
+      display: none;
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    .lobby-panel.active {
+      display: block;
+    }
+    
+    /* Play panel - MVP style */
+    #play-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+    .play-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .play-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    #mode-selector {
+      display: flex;
+      gap: 10px;
+    }
+    .mode-btn {
+      padding: 12px 24px;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.7);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      font-size: 13px;
+      letter-spacing: 0.05em;
+    }
+    .mode-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .mode-btn.active {
+      background: rgba(255,235,59,0.2);
+      border-color: #ffeb3b;
+      color: #ffeb3b;
+    }
+    #play-main-area {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 50px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+      min-height: 400px;
+      justify-content: center;
+    }
+    #selected-mode-display {
+      font-size: 48px;
+      font-weight: 800;
+      color: #ffeb3b;
+      text-transform: uppercase;
+      text-shadow: 0 0 20px rgba(255,235,59,0.4);
+    }
+    #mode-description {
+      font-size: 16px;
+      color: rgba(255,255,255,0.7);
+      max-width: 500px;
+      line-height: 1.6;
+    }
+    #big-play-btn {
+      padding: 20px 80px;
+      font-size: 24px;
+      font-weight: 800;
+      background: linear-gradient(90deg, #ffeb3b, #ff9800);
+      border: none;
+      border-radius: 10px;
+      color: #000;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      box-shadow: 0 8px 25px rgba(255,235,59,0.4);
+      transition: all 0.2s;
+    }
+    #big-play-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(255,235,59,0.6);
+    }
+    #party-status {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 15px 20px;
       background: rgba(0,0,0,0.4);
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    /* Locker panel */
+    #locker-panel {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 30px;
+    }
+    #character-preview {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 120px;
+      min-height: 500px;
+    }
+    #customization-options {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .customize-section {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .customize-section-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffeb3b;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .item-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .item-slot {
+      aspect-ratio: 1;
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 32px;
+    }
+    .item-slot:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,235,59,0.3);
+    }
+    .item-slot.equipped {
+      border-color: #ffeb3b;
+      background: rgba(255,235,59,0.1);
+    }
+    
+    /* Compete panel */
+    #compete-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    .compete-card {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .rank-badge {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      font-weight: 800;
+      color: #fff;
+      border: 3px solid rgba(255,255,255,0.3);
+    }
+    
+    /* Battle Pass panel */
+    #battlepass-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+    #xp-bar-container {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 25px;
+    }
+    #xp-bar {
+      height: 30px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 15px;
+      overflow: hidden;
+      margin-top: 15px;
+    }
+    #xp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ffeb3b, #ff9800);
+      width: 35%;
+      transition: width 0.3s;
+    }
+    .reward-item {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,235,59,0.3);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    /* Social panel */
+    #social-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .friend-item {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 15px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 30px;
     }
-    #player-info {
+    .friend-online {
+      border-color: rgba(0,255,136,0.3);
+    }
+    .friend-info {
       display: flex;
       align-items: center;
       gap: 15px;
     }
-    #player-avatar {
+    .friend-avatar {
       width: 45px;
       height: 45px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -255,304 +578,122 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      font-weight: 700;
-      border: 2px solid rgba(255,255,255,0.2);
-    }
-    #player-name-display {
-      font-size: 16px;
-      font-weight: 600;
-      color: #fff;
-    }
-    #player-level {
-      font-size: 12px;
-      color: #ffeb3b;
-      font-weight: 600;
-    }
-    #currency-bar {
-      display: flex;
-      gap: 20px;
-    }
-    .currency-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(0,0,0,0.4);
-      padding: 8px 15px;
-      border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.1);
-    }
-    .currency-icon {
-      font-size: 16px;
-    }
-    .currency-amount {
-      font-weight: 600;
-      color: #fff;
-    }
-    
-    /* Content panels */
-    .lobby-panel {
-      display: none;
-      flex: 1;
-      padding: 30px;
-      overflow-y: auto;
-    }
-    .lobby-panel.active {
-      display: block;
-    }
-    
-    /* Play panel */
-    #play-panel {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 30px;
-    }
-    #featured-card {
-      width: 100%;
-      max-width: 800px;
-      height: 400px;
-      background: linear-gradient(135deg, rgba(255,235,59,0.1) 0%, rgba(255,152,0,0.1) 100%);
-      border-radius: 15px;
-      border: 2px solid rgba(255,235,59,0.3);
-      padding: 40px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-      overflow: hidden;
-    }
-    #featured-card::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -10%;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(255,235,59,0.2) 0%, transparent 70%);
-      border-radius: 50%;
-    }
-    .featured-header {
-      position: relative;
-      z-index: 1;
-    }
-    .featured-title {
-      font-size: 48px;
-      font-weight: 800;
-      color: #ffeb3b;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      text-shadow: 0 0 20px rgba(255,235,59,0.5);
-      margin-bottom: 10px;
-    }
-    .featured-subtitle {
       font-size: 18px;
-      color: rgba(255,255,255,0.8);
-      font-weight: 500;
+      font-weight: 700;
     }
-    .featured-footer {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #666;
     }
-    .mode-info {
-      display: flex;
-      gap: 20px;
+    .status-dot.online {
+      background: #00ff88;
+      box-shadow: 0 0 10px #00ff88;
     }
-    .info-item {
+    
+    /* Settings panel */
+    #settings-panel {
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 25px;
     }
-    .info-label {
-      font-size: 11px;
-      color: rgba(255,255,255,0.5);
+    .settings-section {
+      background: rgba(0,0,0,0.3);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 25px;
+    }
+    .settings-section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffeb3b;
+      margin-bottom: 20px;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
     }
-    .info-value {
-      font-size: 16px;
-      font-weight: 600;
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+    .setting-label {
+      font-size: 15px;
       color: #fff;
     }
-    #big-play-btn {
-      padding: 18px 60px;
-      font-size: 20px;
-      font-weight: 700;
-      background: linear-gradient(90deg, #ffeb3b, #ff9800);
-      border: none;
-      border-radius: 8px;
-      color: #000;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      box-shadow: 0 5px 20px rgba(255,235,59,0.4);
-      transition: all 0.2s;
-    }
-    #big-play-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 7px 25px rgba(255,235,59,0.6);
-    }
-    #customize-section {
-      width: 100%;
-      max-width: 800px;
-      text-align: center;
-    }
-    .section-title {
-      font-size: 14px;
-      color: rgba(255,255,255,0.6);
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      margin-bottom: 15px;
-    }
-    #name-customize {
+    .setting-control {
       display: flex;
       gap: 10px;
-      justify-content: center;
     }
-    #name-input-new {
-      padding: 12px 20px;
-      font-size: 16px;
-      background: rgba(0,0,0,0.4);
-      border: 2px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
-      color: #fff;
-      outline: none;
-      width: 250px;
-    }
-    #name-input-new:focus {
-      border-color: #ffeb3b;
-    }
-    #save-name-btn {
-      padding: 12px 25px;
+    .setting-btn {
+      padding: 8px 20px;
       background: rgba(255,255,255,0.1);
-      border: 2px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
       color: #fff;
       cursor: pointer;
-      font-weight: 600;
       transition: all 0.2s;
+      font-size: 13px;
     }
-    #save-name-btn:hover {
-      background: rgba(255,255,255,0.15);
-      border-color: rgba(255,255,255,0.4);
+    .setting-btn.active {
+      background: rgba(255,235,59,0.2);
+      border-color: #ffeb3b;
+      color: #ffeb3b;
     }
     
-    /* More panel - grid layout */
-    #more-panel {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 25px;
-      padding: 40px;
-      align-content: start;
-    }
-    .feature-card {
-      background: rgba(0,0,0,0.4);
-      border: 2px solid rgba(255,255,255,0.1);
-      border-radius: 15px;
-      padding: 30px;
-      text-align: center;
-      transition: all 0.3s;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-    }
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, transparent, var(--card-color), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .feature-card:hover {
-      border-color: var(--card-color);
-      transform: translateY(-5px);
-    }
-    .feature-card:hover::before {
-      opacity: 1;
-    }
-    .feature-icon {
-      font-size: 50px;
-      margin-bottom: 15px;
-      opacity: 0.8;
-    }
-    .feature-title {
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 10px;
+    .panel-title {
+      font-size: 28px;
+      font-weight: 800;
       color: #fff;
+      margin-bottom: 20px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    .feature-desc {
-      font-size: 14px;
-      color: rgba(255,255,255,0.6);
-      margin-bottom: 20px;
-      line-height: 1.6;
-    }
-    .coming-soon-badge {
-      display: inline-block;
-      padding: 8px 20px;
-      background: var(--card-color);
-      color: #000;
-      font-weight: 700;
-      border-radius: 20px;
-      font-size: 12px;
-      letter-spacing: 0.1em;
+    
+    @media (max-width: 1024px) {
+      #lobby-sidebar {
+        width: 80px;
+      }
+      .sidebar-tab-label {
+        display: none;
+      }
+      #player-card {
+        display: none;
+      }
+      #locker-panel {
+        grid-template-columns: 1fr;
+      }
     }
     
     @media (max-width: 768px) {
-      #lobby-tabs {
-        padding: 0 15px;
+      #lobby-sidebar {
+        width: 60px;
+        padding: 10px 0;
       }
       #logo {
-        font-size: 20px;
-        margin-right: 15px;
+        font-size: 16px;
+        margin-bottom: 15px;
       }
-      .tab-btn {
-        padding: 10px 20px;
-        font-size: 14px;
+      .sidebar-tab {
+        padding: 12px 10px;
+        justify-content: center;
       }
-      #lobby-topbar {
-        padding: 0 15px;
+      .lobby-panel {
+        padding: 20px;
       }
-      #currency-bar {
-        gap: 10px;
+      #play-main-area {
+        padding: 30px 20px;
       }
-      .currency-item {
-        padding: 6px 10px;
-      }
-      .featured-title {
+      #selected-mode-display {
         font-size: 32px;
       }
-      #featured-card {
-        height: 300px;
-        padding: 25px;
-      }
       #big-play-btn {
-        padding: 15px 40px;
-        font-size: 16px;
-      }
-      .mode-info {
-        flex-direction: column;
-        gap: 10px;
-      }
-      #name-customize {
-        flex-direction: column;
-      }
-      #name-input-new {
-        width: 100%;
-      }
-      #more-panel {
-        grid-template-columns: 1fr;
-        padding: 20px;
+        padding: 16px 50px;
+        font-size: 18px;
       }
     }
 
@@ -787,115 +928,263 @@
 
   <!-- Lobby -->
   <div id="lobby" style="display:none;">
-    <!-- Top Tabs Navigation -->
-    <div id="lobby-tabs">
+    <!-- Left Sidebar -->
+    <div id="lobby-sidebar">
       <div id="logo">BLOCKARENA</div>
-      <button class="tab-btn active" data-tab="play">Play</button>
-      <button class="tab-btn" data-tab="more">More</button>
+      <div class="sidebar-tab active" data-tab="play">
+        <span class="sidebar-tab-icon">▶</span>
+        <span class="sidebar-tab-label">Play</span>
+      </div>
+      <div class="sidebar-tab" data-tab="locker">
+        <span class="sidebar-tab-icon">👤</span>
+        <span class="sidebar-tab-label">Locker</span>
+      </div>
+      <div class="sidebar-tab" data-tab="compete">
+        <span class="sidebar-tab-icon">🏆</span>
+        <span class="sidebar-tab-label">Compete</span>
+      </div>
+      <div class="sidebar-tab" data-tab="battlepass">
+        <span class="sidebar-tab-icon">⭐</span>
+        <span class="sidebar-tab-label">Battle Pass</span>
+      </div>
+      <div class="sidebar-tab" data-tab="social">
+        <span class="sidebar-tab-icon">👥</span>
+        <span class="sidebar-tab-label">Social</span>
+      </div>
+      <div class="sidebar-tab" data-tab="settings">
+        <span class="sidebar-tab-icon">⚙</span>
+        <span class="sidebar-tab-label">Settings</span>
+      </div>
     </div>
     
-    <!-- Main Content -->
-    <div id="lobby-main">
-      <!-- Top Bar -->
-      <div id="lobby-topbar">
-        <div id="player-info">
-          <div id="player-avatar">?</div>
-          <div>
-            <div id="player-name-display">Guest</div>
-            <div id="player-level">Level 1</div>
-          </div>
-        </div>
-        <div id="currency-bar">
-          <div class="currency-item">
-            <span class="currency-icon">⭐</span>
-            <span class="currency-amount">0</span>
-          </div>
-          <div class="currency-item">
-            <span class="currency-icon">💎</span>
-            <span class="currency-amount">0</span>
-          </div>
-        </div>
-      </div>
+    <!-- Content Wrapper -->
+    <div id="lobby-content-wrapper">
       
       <!-- Play Panel -->
       <div id="play-panel" class="lobby-panel active">
-        <div id="featured-card">
-          <div class="featured-header">
-            <div class="featured-title">BlockArena</div>
-            <div class="featured-subtitle">Fast-paced tactical FPS action</div>
-          </div>
-          <div class="featured-footer">
-            <div class="mode-info">
-              <div class="info-item">
-                <div class="info-label">Mode</div>
-                <div class="info-value">Free For All</div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Players</div>
-                <div class="info-value">1 + 7 Bots</div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Map</div>
-                <div class="info-value">Arena</div>
-              </div>
-            </div>
-            <button id="big-play-btn">Play Now</button>
+        <div class="play-header">
+          <div class="play-title">Ready to Play</div>
+          <div id="mode-selector">
+            <button class="mode-btn active" data-mode="ffa">Solo</button>
+            <button class="mode-btn" data-mode="duo">Duo</button>
+            <button class="mode-btn" data-mode="squad">Squad</button>
+            <button class="mode-btn" data-mode="custom">Custom</button>
           </div>
         </div>
         
-        <div id="customize-section">
-          <div class="section-title">Customize Your Name</div>
-          <div id="name-customize">
-            <input id="name-input-new" placeholder="Enter your name" maxlength="12" />
-            <button id="save-name-btn">Save</button>
+        <div id="play-main-area">
+          <div id="selected-mode-display">FREE FOR ALL</div>
+          <div id="mode-description">Jump into fast-paced arena combat. Eliminate opponents, survive, and dominate the leaderboard. No teams, only you.</div>
+          <button id="big-play-btn">PLAY NOW</button>
+          <div id="party-status">
+            <span style="color: #00ff88;">●</span>
+            <span style="color: rgba(255,255,255,0.8);">Ready to start</span>
           </div>
         </div>
       </div>
       
-      <!-- More Panel -->
-      <div id="more-panel" class="lobby-panel">
-        <div class="feature-card" style="--card-color: #ffeb3b;">
-          <div class="feature-icon">⭐</div>
-          <div class="feature-title">Battle Pass</div>
-          <div class="feature-desc">Unlock exclusive rewards, skins, and items as you level up through the season!</div>
-          <span class="coming-soon-badge">COMING SOON</span>
+      <!-- Locker Panel -->
+      <div id="locker-panel" class="lobby-panel">
+        <div id="character-preview">
+          <div style="font-size: 80px;">👤</div>
         </div>
-        
-        <div class="feature-card" style="--card-color: #00c4ff;">
-          <div class="feature-icon">📋</div>
-          <div class="feature-title">Quests</div>
-          <div class="feature-desc">Complete daily and weekly challenges to earn XP, currency, and special rewards!</div>
-          <span class="coming-soon-badge">COMING SOON</span>
-        </div>
-        
-        <div class="feature-card" style="--card-color: #ff5c5c;">
-          <div class="feature-icon">🛒</div>
-          <div class="feature-title">Item Shop</div>
-          <div class="feature-desc">Browse and purchase exclusive skins, emotes, weapons, and cosmetics!</div>
-          <span class="coming-soon-badge">COMING SOON</span>
-        </div>
-        
-        <div class="feature-card" style="--card-color: #9b5de5;">
-          <div class="feature-icon">👤</div>
-          <div class="feature-title">Locker</div>
-          <div class="feature-desc">Customize your character with skins, back bling, pickaxes, and emotes!</div>
-          <span class="coming-soon-badge">COMING SOON</span>
-        </div>
-        
-        <div class="feature-card" style="--card-color: #00ff88;">
-          <div class="feature-icon">🏆</div>
-          <div class="feature-title">Leaderboards</div>
-          <div class="feature-desc">Compete with players worldwide and climb to the top of the rankings!</div>
-          <span class="coming-soon-badge">COMING SOON</span>
-        </div>
-        
-        <div class="feature-card" style="--card-color: #ffffff;">
-          <div class="feature-icon">⚙</div>
-          <div class="feature-title">Settings</div>
-          <div class="feature-desc">Customize graphics, controls, audio, and gameplay to your preference!</div>
-          <span class="coming-soon-badge">COMING SOON</span>
+        <div id="customization-options">
+          <div class="customize-section">
+            <div class="customize-section-title">Outfit</div>
+            <div class="item-grid">
+              <div class="item-slot equipped">👕</div>
+              <div class="item-slot">🎽</div>
+              <div class="item-slot">👔</div>
+            </div>
+          </div>
+          <div class="customize-section">
+            <div class="customize-section-title">Back Bling</div>
+            <div class="item-grid">
+              <div class="item-slot">🎒</div>
+              <div class="item-slot equipped">⚔</div>
+              <div class="item-slot">🛡</div>
+            </div>
+          </div>
+          <div class="customize-section">
+            <div class="customize-section-title">Emotes</div>
+            <div class="item-grid">
+              <div class="item-slot equipped">👋</div>
+              <div class="item-slot">💃</div>
+              <div class="item-slot">🕺</div>
+            </div>
+          </div>
         </div>
       </div>
+      
+      <!-- Compete Panel -->
+      <div id="compete-panel" class="lobby-panel">
+        <div class="panel-title">Competitive</div>
+        <div class="compete-card">
+          <div>
+            <div style="font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 10px;">Ranked Arena</div>
+            <div style="color: rgba(255,255,255,0.7);">Climb the ranks and prove your skills</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 30px;">
+            <div class="rank-badge">5</div>
+            <button class="mode-btn active">Play Ranked</button>
+          </div>
+        </div>
+        <div class="compete-card" style="opacity: 0.5;">
+          <div>
+            <div style="font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 10px;">Tournament</div>
+            <div style="color: rgba(255,255,255,0.7);">Coming Soon</div>
+          </div>
+          <div class="rank-badge" style="opacity: 0.3;">?</div>
+        </div>
+      </div>
+      
+      <!-- Battle Pass Panel -->
+      <div id="battlepass-panel" class="lobby-panel">
+        <div class="panel-title">Battle Pass Progress</div>
+        <div id="xp-bar-container">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <span style="font-size: 20px; font-weight: 700; color: #ffeb3b;">Level 12</span>
+            <span style="color: rgba(255,255,255,0.7);">3,500 / 10,000 XP</span>
+          </div>
+          <div id="xp-bar">
+            <div id="xp-fill" style="width: 35%;"></div>
+          </div>
+        </div>
+        
+        <div class="panel-title" style="font-size: 20px; margin-top: 30px;">Recent Rewards</div>
+        <div class="reward-item">
+          <div style="font-size: 48px;">🎽</div>
+          <div>
+            <div style="font-size: 18px; font-weight: 700; color: #fff;">Combat Vest</div>
+            <div style="color: rgba(255,255,255,0.6);">Unlocked at Level 10</div>
+          </div>
+        </div>
+        <div class="reward-item">
+          <div style="font-size: 48px;">⚔</div>
+          <div>
+            <div style="font-size: 18px; font-weight: 700; color: #fff;">Dual Blades</div>
+            <div style="color: rgba(255,255,255,0.6);">Unlocked at Level 8</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Social Panel -->
+      <div id="social-panel" class="lobby-panel">
+        <div class="panel-title">Friends</div>
+        <div class="friend-item friend-online">
+          <div class="friend-info">
+            <div class="friend-avatar">A</div>
+            <div>
+              <div style="font-weight: 600; color: #fff;">Alex_Pro</div>
+              <div style="font-size: 12px; color: rgba(255,255,255,0.6);">In Lobby</div>
+            </div>
+            <span class="status-dot online"></span>
+          </div>
+          <button class="mode-btn">Invite</button>
+        </div>
+        <div class="friend-item friend-online">
+          <div class="friend-info">
+            <div class="friend-avatar">S</div>
+            <div>
+              <div style="font-weight: 600; color: #fff;">ShadowNinja</div>
+              <div style="font-size: 12px; color: rgba(255,255,255,0.6);">In Match</div>
+            </div>
+            <span class="status-dot online"></span>
+          </div>
+          <button class="mode-btn">Invite</button>
+        </div>
+        <div class="friend-item">
+          <div class="friend-info">
+            <div class="friend-avatar">T</div>
+            <div>
+              <div style="font-weight: 600; color: #fff;">TacticalGamer</div>
+              <div style="font-size: 12px; color: rgba(255,255,255,0.6);">Offline</div>
+            </div>
+            <span class="status-dot"></span>
+          </div>
+          <button class="mode-btn" disabled style="opacity: 0.5;">Invite</button>
+        </div>
+      </div>
+      
+      <!-- Settings Panel -->
+      <div id="settings-panel" class="lobby-panel">
+        <div class="panel-title">Settings</div>
+        
+        <div class="settings-section">
+          <div class="settings-section-title">Audio</div>
+          <div class="setting-row">
+            <div class="setting-label">Music</div>
+            <div class="setting-control">
+              <button class="setting-btn active">On</button>
+              <button class="setting-btn">Off</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Sound Effects</div>
+            <div class="setting-control">
+              <button class="setting-btn active">On</button>
+              <button class="setting-btn">Off</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <div class="settings-section-title">Graphics</div>
+          <div class="setting-row">
+            <div class="setting-label">Quality</div>
+            <div class="setting-control">
+              <button class="setting-btn">Low</button>
+              <button class="setting-btn active">Medium</button>
+              <button class="setting-btn">High</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <div class="settings-section-title">Controls</div>
+          <div class="setting-row">
+            <div class="setting-label">Mouse Sensitivity</div>
+            <div class="setting-control">
+              <button class="setting-btn">Low</button>
+              <button class="setting-btn active">Normal</button>
+              <button class="setting-btn">High</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <div class="settings-section-title">Account</div>
+          <div class="setting-row">
+            <div class="setting-label">Username</div>
+            <div class="setting-control">
+              <button id="edit-name-btn-settings" class="setting-btn">Edit Name</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- Right Player Card -->
+    <div id="player-card">
+      <div id="player-card-header">
+        <div id="player-avatar-large">?</div>
+        <div id="player-name-card">Guest</div>
+        <div id="player-level-card">Level 1</div>
+      </div>
+      <div class="player-stat">
+        <span class="player-stat-label">Wins</span>
+        <span class="player-stat-value">0</span>
+      </div>
+      <div class="player-stat">
+        <span class="player-stat-label">Kills</span>
+        <span class="player-stat-value">0</span>
+      </div>
+      <div class="player-stat">
+        <span class="player-stat-label">K/D</span>
+        <span class="player-stat-value">0.0</span>
+      </div>
+      <button id="edit-name-btn">Edit Name</button>
     </div>
   </div>
 
@@ -1050,11 +1339,11 @@
     const loadingBar = document.getElementById('loading-bar');
     const loadingPercent = document.getElementById('loading-percent');
     const lobby = document.getElementById('lobby');
-    const nameInputNew = document.getElementById('name-input-new');
-    const saveNameBtn = document.getElementById('save-name-btn');
     const bigPlayBtn = document.getElementById('big-play-btn');
-    const playerNameDisplay = document.getElementById('player-name-display');
-    const playerAvatar = document.getElementById('player-avatar');
+    const playerNameCard = document.getElementById('player-name-card');
+    const playerAvatarLarge = document.getElementById('player-avatar-large');
+    const editNameBtn = document.getElementById('edit-name-btn');
+    const editNameBtnSettings = document.getElementById('edit-name-btn-settings');
     const deathScreen = document.getElementById('death-screen');
     const deathKillerEl = document.getElementById('death-killer');
     const deathKillsEl = document.getElementById('death-kills');
@@ -1071,9 +1360,8 @@
     
     // Load saved name
     const savedName = localStorage.getItem('ba_name') || 'Guest';
-    nameInputNew.value = savedName;
-    playerNameDisplay.textContent = savedName;
-    playerAvatar.textContent = savedName.charAt(0).toUpperCase();
+    playerNameCard.textContent = savedName;
+    playerAvatarLarge.textContent = savedName.charAt(0).toUpperCase();
 
     // ============================================================================
     // POINTER LOCK
@@ -2029,16 +2317,16 @@
     // ============================================================================
     // LOBBY NAVIGATION
     // ============================================================================
-    const tabBtns = document.querySelectorAll('.tab-btn');
+    const sidebarTabs = document.querySelectorAll('.sidebar-tab');
     const lobbyPanels = document.querySelectorAll('.lobby-panel');
     
-    tabBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tabName = btn.getAttribute('data-tab');
+    sidebarTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.getAttribute('data-tab');
         
-        // Update active tab button
-        tabBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        // Update active tab
+        sidebarTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
         
         // Update active panel
         lobbyPanels.forEach(p => p.classList.remove('active'));
@@ -2049,35 +2337,73 @@
       });
     });
 
-    // Save name button
-    saveNameBtn.addEventListener('click', () => {
-      const name = (nameInputNew.value.trim() || 'Guest').slice(0, 12);
-      localStorage.setItem('ba_name', name);
-      playerNameDisplay.textContent = name;
-      playerAvatar.textContent = name.charAt(0).toUpperCase();
-      
-      // Visual feedback
-      saveNameBtn.textContent = 'Saved!';
-      setTimeout(() => {
-        saveNameBtn.textContent = 'Save';
-      }, 1000);
+    // Mode selector
+    const modeBtns = document.querySelectorAll('.mode-btn[data-mode]');
+    const modeDisplay = document.getElementById('selected-mode-display');
+    const modeDescription = document.getElementById('mode-description');
+    
+    const modeData = {
+      ffa: {
+        title: 'FREE FOR ALL',
+        desc: 'Jump into fast-paced arena combat. Eliminate opponents, survive, and dominate the leaderboard. No teams, only you.'
+      },
+      duo: {
+        title: 'DUO',
+        desc: 'Team up with a partner. Coordinate strategies and dominate together in 2v2v2 combat.'
+      },
+      squad: {
+        title: 'SQUAD',
+        desc: 'Assemble your crew. Work together with your team to outlast and outfight all other squads.'
+      },
+      custom: {
+        title: 'CUSTOM MATCH',
+        desc: 'Create your own rules. Set up private matches with friends and customize every aspect of the game.'
+      }
+    };
+    
+    modeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-mode');
+        
+        // Update active button
+        modeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update display
+        if (modeData[mode]) {
+          modeDisplay.textContent = modeData[mode].title;
+          modeDescription.textContent = modeData[mode].desc;
+        }
+      });
     });
+
+    // Edit name functionality
+    function editPlayerName() {
+      const newName = prompt('Enter your new name (max 12 characters):', savedName);
+      if (newName && newName.trim()) {
+        const finalName = newName.trim().slice(0, 12);
+        localStorage.setItem('ba_name', finalName);
+        playerNameCard.textContent = finalName;
+        playerAvatarLarge.textContent = finalName.charAt(0).toUpperCase();
+        
+        // Update in-game if player exists
+        if (localPlayer) {
+          localPlayer.name = finalName;
+          localPlayer.nameLabel.textContent = finalName;
+        }
+      }
+    }
+    
+    editNameBtn.addEventListener('click', editPlayerName);
+    editNameBtnSettings.addEventListener('click', editPlayerName);
 
     // Play button
     bigPlayBtn.addEventListener('click', () => {
-      const name = (nameInputNew.value.trim() || 'Guest').slice(0, 12);
-      localStorage.setItem('ba_name', name);
+      const name = localStorage.getItem('ba_name') || 'Guest';
       lobby.style.display = 'none';
       gameStarted = true;
       createPlayers(name);
       requestPointerLock();
-    });
-
-    // Allow Enter key in name input
-    nameInputNew.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        bigPlayBtn.click();
-      }
     });
 
     // Death screen buttons
