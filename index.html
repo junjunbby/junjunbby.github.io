@@ -44,9 +44,6 @@ body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--
 .header h1 { font-family:var(--font-title); font-size:clamp(2rem,5vw,4rem); color:#e0e0e0; text-shadow:0 2px 10px rgba(0,0,0,0.8); margin-bottom:0.5rem; }
 .header p { font-size:clamp(1rem,2vw,1.2rem); color: rgba(200,200,200,0.7); }
 
-/* PLAYER COUNT */
-#playerCount { margin-top:8px; font-size:1rem; color:rgba(200,200,200,0.8); opacity:0; animation: fadeInCount 1s forwards; }
-
 /* SETTINGS MENU TOP LEFT */
 .settings-menu { position:fixed; top:20px; left:20px; z-index:9999; font-family:var(--font-main); }
 .settings-btn { background-color:#4a4a4a; color:#fff; border:none; font-size:1.5rem; padding:8px 12px; border-radius:8px; cursor:pointer; transition: background-color 0.2s, transform 0.2s; }
@@ -81,6 +78,16 @@ body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--
 .game-card:hover .game-thumbnail { transform:scale(1.1); box-shadow:0 8px 25px rgba(0,0,0,0.6); }
 .game-title { font-size:1.5rem; font-weight:bold; text-align:center; position:relative; z-index:1; text-shadow:0 2px 10px rgba(0,0,0,0.5); }
 
+/* LIKE BUTTON */
+.like-container { display:flex; flex-direction:column; align-items:center; gap:0.5rem; position:relative; z-index:2; }
+.like-btn { background:linear-gradient(135deg, #ff4757 0%, #ff6348 100%); border:none; color:#fff; font-size:1.2rem; padding:10px 20px; border-radius:12px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.3s ease; box-shadow:0 4px 15px rgba(255,71,87,0.3); font-weight:bold; }
+.like-btn:hover { transform:scale(1.1); box-shadow:0 6px 20px rgba(255,71,87,0.5); }
+.like-btn:active { transform:scale(0.95); }
+.like-btn.liked { background:linear-gradient(135deg, #ff6348 0%, #ff7979 100%); animation:likePopContinuous 0.6s ease; }
+.like-count { font-size:1rem; color:rgba(200,200,200,0.9); font-weight:600; }
+.heart-icon { font-size:1.3rem; transition:transform 0.3s ease; }
+.like-btn:hover .heart-icon { transform:scale(1.2); }
+
 /* DEV PROFILE */
 .dev-profile { background:var(--profile-bg); border:2px solid var(--card-border); border-radius:25px; padding:3rem 2rem; max-width:600px; margin:4rem auto 2rem; text-align:center; backdrop-filter:blur(10px); animation:fadeIn var(--animation-speed) ease-out 0.3s backwards; }
 .dev-avatar { width:var(--avatar-size); height:var(--avatar-size); border-radius:50%; border:var(--avatar-border); object-fit:cover; margin:0 auto 1.5rem; display:block; animation:pulse 2s ease-in-out infinite; box-shadow:0 0 20px rgba(0,0,0,0.5); }
@@ -92,7 +99,7 @@ body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--
 @keyframes popIn { from{opacity:0; transform:scale(0.5) rotate(-10deg);} to{opacity:1; transform:scale(1) rotate(0deg);} }
 @keyframes fadeIn { from{opacity:0; transform:translateY(30px);} to{opacity:1; transform:translateY(0);} }
 @keyframes pulse { 0%,100%{transform:scale(1); box-shadow:0 0 20px rgba(0,0,0,0.5);} 50%{transform:scale(1.05); box-shadow:0 0 30px rgba(0,0,0,0.7);} }
-@keyframes fadeInCount { from { opacity:0; transform: translateY(-10px); } to { opacity:1; transform: translateY(0); } }
+@keyframes likePopContinuous { 0%{transform:scale(1);} 50%{transform:scale(1.2) rotate(5deg);} 100%{transform:scale(1);} }
 
 /* RESPONSIVE */
 @media (max-width:768px) {
@@ -116,7 +123,6 @@ body { font-family:var(--font-main); background:var(--bg-gradient); color:var(--
 <header class="header">
 <h1>🎮 MINI ARCADE 🎮</h1>
 <p>Choose Your Favourite Game!</p>
-<p id="playerCount">Current Players Online: 0</p>
 </header>
 
 <!-- SETTINGS MENU TOP LEFT -->
@@ -139,10 +145,19 @@ Contribute
 <!-- GAMES GRID -->
 <div class="games-grid" id="gamesGrid">
 
-<a href="blockarena.html" class="game-card">
+<div class="game-card" data-game="blockarena">
+<a href="blockarena.html" style="display:contents;">
 <img src="https://cdn.discordapp.com/attachments/1337835353826001058/1459256112237908031/image0.jpg?ex=69629da8&is=69614c28&hm=67d4cb4e7be11c6a2d878eff61b2b9a01f9e9543d301b8f01de20a1cde714311&" alt="Block Arena" class="game-thumbnail">
 <h3 class="game-title">Block Arena</h3>
 </a>
+<div class="like-container">
+<button class="like-btn" data-game="blockarena">
+<span class="heart-icon">❤️</span>
+<span>Like</span>
+</button>
+<div class="like-count"><span class="likes-number">0</span> likes</div>
+</div>
+</div>
 
 </div>
 
@@ -198,17 +213,82 @@ document.querySelectorAll('.game-card').forEach(card=>{
     card.addEventListener('touchend',function(){this.style.transform='';});
 });
 
-// FAKE PLAYER COUNT
-function updatePlayerCount() {
-    const count = Math.floor(Math.random() * (50 - 20 + 1)) + 20;
-    const playerCountEl = document.getElementById('playerCount');
-    playerCountEl.textContent = `Current Players Online: ${count}`;
-    playerCountEl.style.animation = 'none';
-    void playerCountEl.offsetWidth;
-    playerCountEl.style.animation = 'fadeInCount 1s forwards';
+// LIKE SYSTEM
+const LIKES_KEY = 'miniArcadeLikes';
+const USER_LIKES_KEY = 'miniArcadeUserLikes';
+
+// Initialize likes from localStorage
+function getLikes() {
+    const stored = localStorage.getItem(LIKES_KEY);
+    return stored ? JSON.parse(stored) : {};
 }
-updatePlayerCount();
-setInterval(updatePlayerCount, 3000);
+
+function getUserLikes() {
+    const stored = localStorage.getItem(USER_LIKES_KEY);
+    return stored ? JSON.parse(stored) : {};
+}
+
+function saveLikes(likes) {
+    localStorage.setItem(LIKES_KEY, JSON.stringify(likes));
+}
+
+function saveUserLikes(userLikes) {
+    localStorage.setItem(USER_LIKES_KEY, JSON.stringify(userLikes));
+}
+
+// Load and display likes
+function updateLikeDisplay() {
+    const likes = getLikes();
+    const userLikes = getUserLikes();
+    
+    document.querySelectorAll('.like-btn').forEach(btn => {
+        const gameName = btn.dataset.game;
+        const likeCount = likes[gameName] || 0;
+        const hasLiked = userLikes[gameName] || false;
+        
+        // Update count
+        const countElement = btn.closest('.like-container').querySelector('.likes-number');
+        countElement.textContent = likeCount;
+        
+        // Update button state
+        if (hasLiked) {
+            btn.classList.add('liked');
+        } else {
+            btn.classList.remove('liked');
+        }
+    });
+}
+
+// Handle like button clicks
+document.querySelectorAll('.like-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const gameName = btn.dataset.game;
+        const likes = getLikes();
+        const userLikes = getUserLikes();
+        
+        if (!userLikes[gameName]) {
+            // User hasn't liked this game yet
+            likes[gameName] = (likes[gameName] || 0) + 1;
+            userLikes[gameName] = true;
+            btn.classList.add('liked');
+        } else {
+            // User already liked, so unlike
+            likes[gameName] = Math.max(0, (likes[gameName] || 0) - 1);
+            userLikes[gameName] = false;
+            btn.classList.remove('liked');
+        }
+        
+        saveLikes(likes);
+        saveUserLikes(userLikes);
+        updateLikeDisplay();
+    });
+});
+
+// Initialize on page load
+updateLikeDisplay();
 </script>
 </body>
 </html>
