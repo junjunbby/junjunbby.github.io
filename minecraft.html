@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Block‑World MVP – Browser‑Only</title>
+  <style>
+    html, body { width:100%; height:100%; margin:0; overflow:hidden; }
+    #renderCanvas { width:100%; height:100%; touch-action:none; display:block; }
+  </style>
+
+  <!-- Babylon.js core + loaders (for textures, etc.) -->
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/babylonjs.loaders.min.js"></script>
+</head>
+
+<body>
+  <canvas id="renderCanvas"></canvas>
+
+  <script>
+    // --------------------------------------------------------------
+    // 1️⃣ BASIC BABYLON SETUP
+    // --------------------------------------------------------------
+    const canvas = document.getElementById('renderCanvas');
+    const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+
+    const createScene = () => {
+      const scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color4(0.7, 0.9, 1, 1); // light sky
+
+      // Camera: rotate around (0,0,0), zoom with mouse wheel
+      const camera = new BABYLON.ArcRotateCamera(
+        "camera",
+        -Math.PI / 2,
+        Math.PI / 4,
+        30,
+        new BABYLON.Vector3(0, 0, 0),
+        scene
+      );
+      camera.attachControl(canvas, true);
+      camera.lowerRadiusLimit = 5;
+      camera.upperRadiusLimit = 100;
+      camera.wheelsensitivity = 0.5;
+
+      // Light
+      new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+      // --------------------------------------------------------------
+      // 2️⃣ BLOCK (VOXEL) MANAGER
+      // --------------------------------------------------------------
+      const Block = {
+        size: 1,
+        /** simple material – you can replace this with a texture atlas for “grass”, “stone”… */
+        getMaterial: (scene) => {
+          if (!Block._material) {
+            const mat = new BABYLON.StandardMaterial("blockMat", scene);
+            mat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+            mat.specularColor = new BABYLON.Color3(0.07, 0.07, 0.07);
+            Block._material = mat;
+          }
+          return Block._material;
+        },
+        /** create a cube mesh at world coordinates (x,y,z) */
+        createAt: (x, y, z, scene) => {
+          const mesh = BABYLON.MeshBuilder.CreateBox(
+            `block_${x}_${y}_${z}`,
+            { size: Block.size },
+            scene
+          );
+          mesh.position.set(x + 0.5, y + 0.5, z + 0.5); // centre of the cube
+          mesh.material = Block.getMaterial(scene);
+          // allow pointer pick on this mesh
+          mesh.isPickable = true;
+          return mesh;
+        }
+      };
+
+      // --------------------------------------------------------------
+      // 3️⃣ WORLD CONSTRUCTION (a flat ground 20×20)
+      // --------------------------------------------------------------
+      const world = {
+        /** map of "x_y_z" -> mesh */
+        blocks: new Map(),
+        /** add a block at integer coordinates (x, y, z) */
+        setBlock(x, y, z) {
+          const key = `${x}_${y}_${z}`;
+          if (this.blocks.has(key)) return; // already exists
+          const mesh = Block.createAt(x, y, z, scene);
+          this.blocks.set(key, mesh);
+        },
+        /** remove a block at integer coordinates (x, y, z) */
+        removeBlock(x, y, z) {
+          const key = `${x}_${y}_${z}`;
+          const mesh = this.blocks.get(key);
+          if (mesh) {
+            mesh.dispose();
+            this.blocks.delete(key);
+          }
+        },
+        /** get block mesh at coordinates, undefined if empty */
+        getBlock(x, y, z) {
+          return this.blocks.get(`${x}_${y}_${z}`);
+        }
+      };
+
+      // Build a simple flat world: 20×20 blocks on y = 0
+      const groundSize = 20;
+      for (let x = -groundSize; x <= groundSize; x++) {
+        for (let z = -groundSize; z <= groundSize; z++) {
+          world.setBlock(x, 0, z);
+        }
+      }
+
+      // --------------------------------------------------------------
+      // 4️⃣ INPUT – PLACE & BREAK
+      // --------------------------------------------------------------
+
+      // Helper: integer coordinates from a world position (rounded down)
+      const worldCoord = (pos) => Math.floor(pos.x) * 1e0 + Math.floor(pos.y) * 1e2 + Math.floor(pos.z) * 1e4; // unused but handy
+
+      // When we click on a block we get the face normal → the adjacent coordinate to place a new block.
+      const onPointerDown = (evt) => {
+        // Babylon reports the pick result via the scene's onPointerObservable
+        const pickInfo = scene.pick(scene.pointerX, scene.pointerY, (mesh) => mesh.isPickable);
+        if (!pickInfo.hit) return;
+
+        const pickedMesh = pickInfo.pickedMesh;
+        const pickedPoint = pickInfo.pickedPoint; // exact point of the hit
+        const normal = pickInfo.getNormal(true); // normal vector of the face we hit (already normalized)
+
+        // Convert mesh position back to integer block coordinates:
+        const bx = Math.floor(pickedMesh.position.x - 0.5);
+        const by = Math.floor(pickedMesh.position.y - 0.5);
+        const bz = Math.floor(pickedMesh.position.z - 0.5);
+
+        // Right‑click (or Shift+Left) → BREAK
+        if (evt.button === 2 || (evt.button === 0 && evt.shiftKey)) {
+          world.removeBlock(bx, by, bz);
+          return;
+        }
+
+        // Left‑click → PLACE a new block *adjacent* to the face we clicked.
+        const placeX = bx + Math.round(normal.x);
+        const placeY = by + Math.round(normal.y);
+        const placeZ = bz + Math.round(normal.z);
+        world.setBlock(placeX, placeY, placeZ);
+      };
+
+      // Attach event listeners
+      scene.onPointerObservable.add((pointerInfo) => {
+        if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+          onPointerDown(pointerInfo.event);
+        }
+      });
+
+      // Prevent context‑menu on right‑click (so we can break blocks)
+      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      // --------------------------------------------------------------
+      // 5️⃣ RETURN SCENE
+      // --------------------------------------------------------------
+      return scene;
+    };
+
+    // --------------------------------------------------------------
+    // 6️⃣ ENGINE & RENDER LOOP
+    // --------------------------------------------------------------
+    const scene = createScene();
+    engine.runRenderLoop(() => {
+      scene.render();
+    });
+
+    // Resize handling
+    window.addEventListener('resize', () => {
+      engine.resize();
+    });
+  </script>
+</body>
+</html>
