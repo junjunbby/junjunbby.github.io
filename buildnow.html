@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BuildNow GG – All‑in‑One HTML Prototype</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+/* ---- GLOBAL ---- */
+html,body{margin:0;padding:0;overflow:hidden;width:100%;height:100%;background:#111;font-family:sans-serif;color:#fff;}
+canvas{display:block;}
+/* ---- HUD ---- */
+#hud{position:absolute;top:10px;left:10px;z-index:10;}
+#healthBar{width:150px;height:12px;background:#444;border:1px solid #222;margin-bottom:6px;position:relative;}
+#healthFill{height:100%;background:#e00;width:100%;}
+/* ---- MENU OVERLAY ---- */
+#menuOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:100;}
+.menuScreen{display:none;text-align:center;max-width:400px;}
+.menuScreen.active{display:block;}
+.menuScreen button,.menuScreen select,.menuScreen input{margin:0.5rem;padding:0.6rem 1rem;font-size:1rem;cursor:pointer;}
+.menuScreen h1{font-size:2.5rem;margin-bottom:1rem;}
+.menuScreen h2{font-size:2rem;margin-bottom:0.8rem;}
+</style>
+<!-- Three.js (r152) -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.min.js"></script>
+<!-- PeerJS (signalling server) -->
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+<!-- MENU OVERLAY -->
+<div id="menuOverlay">
+  <!-- MAIN MENU -->
+  <section id="menuMain" class="menuScreen active">
+    <h1>BuildNow GG</h1>
+    <button id="btnCreateRoom">Create Room</button>
+    <button id="btnJoinRoom">Join Room</button>
+    <button id="btnSettings">Settings</button>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="menuSettings" class="menuScreen hidden">
+    <h2>Settings</h2>
+    <label>Mouse sensitivity
+      <input id="rangeSens" type="range" min="0.5" max="2.5" step="0.1" value="1">
+    </label>
+    <button id="btnBackFromSettings">Back</button>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="menuLobby" class="menuScreen hidden">
+    <h2>Lobby</h2>
+    <p>Room code: <span id="roomCode">—</span></p>
+    <p>Players:</p>
+    <ul id="playerList"></ul>
+    <button id="btnStartGame" class="hidden">Start Game</button>
+    <button id="btnLeaveLobby">Leave Lobby</button>
+  </section>
+
+  <!-- PAUSE -->
+  <section id="menuPause" class="menuScreen hidden">
+    <h2>Paused</h2>
+    <button id="btnResume">Resume</button>
+    <button id="btnPauseSettings">Settings</button>
+    <button id="btnLeaveMatch">Leave Match</button>
+  </section>
+
+  <!-- END SCREEN -->
+  <section id="menuEnd" class="menuScreen hidden">
+    <h2 id="endTitle">You died!</h2>
+    <button id="btnPlayAgain">Play again</button>
+    <button id="btnBackToLobby">Back to lobby</button>
+  </section>
+</div>
+
+<!-- HUD (only visible during a match) -->
+<div id="hud" class="hidden">
+  <div id="healthBar"><div id="healthFill"></div></div>
+  Weapon: <span id="weaponName">Pistol</span><br>
+  Build: <span id="buildSelected">None</span>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+/* ==============================================================
+   BuildNow GG – single‑file prototype
+   --------------------------------------------------------------
+   Everything (scene, physics, UI, networking) lives inside this
+   self‑executing function.  Open the file via a local web server
+   (e.g. `python -m http.server`) so that the PeerJS websocket
+   works correctly.
+   ============================================================== */
+(() => {
+  // ==================== GLOBAL CONFIG ==========================
+  const BUILD_TYPES = { Q:'wall', C:'floor', V:'ramp', Shift:'roof' };
+  const BUILD_COLORS = { wall:'#888', floor:'#777', ramp:'#666', roof:'#555' };
+  const GRID_SIZE = 1;
+  const PLAYER_SIZE = {w:1, h:2, d:1};
+  const MOVE_SPEED = 8; // units per second
+  const JUMP_SPEED = 5;
+  const GRAVITY = 9.8;
+  const ARENA_LIMIT = 50; // ± limit for X/Z
+  const MAX_PLAYERS = 6;
+
+  // ==================== UI / MENU ==============================
+  const menu = {
+    overlay       : document.getElementById('menuOverlay'),
+    hud           : document.getElementById('hud'),
+    healthFill    : document.getElementById('healthFill'),
+    weaponName    : document.getElementById('weaponName'),
+    buildSelected : document.getElementById('buildSelected'),
+
+    // screens
+    main          : document.getElementById('menuMain'),
+    settings      : document.getElementById('menuSettings'),
+    lobby         : document.getElementById('menuLobby'),
+    pause         : document.getElementById('menuPause'),
+    end           : document.getElementById('menuEnd'),
+
+    // buttons & inputs
+    btnCreateRoom : document.getElementById('btnCreateRoom'),
+    btnJoinRoom   : document.getElementById('btnJoinRoom'),
+    btnSettings   : document.getElementById('btnSettings'),
+    btnBackFromSettings : document.getElementById('btnBackFromSettings'),
+
+    // Settings controls
+    rangeSens     : document.getElementById('rangeSens'),
+
+    // Lobby
+    roomCode     : document.getElementById('roomCode'),
+    playerList   : document.getElementById('playerList'),
+    btnStartGame : document.getElementById('btnStartGame'),
+    btnLeaveLobby: document.getElementById('btnLeaveLobby'),
+
+    // Pause
+    btnResume    : document.getElementById('btnResume'),
+    btnPauseSettings : document.getElementById('btnPauseSettings'),
+    btnLeaveMatch : document.getElementById('btnLeaveMatch'),
+
+    // End
+    endTitle     : document.getElementById('endTitle'),
+    btnPlayAgain : document.getElementById('btnPlayAgain'),
+    btnBackToLobby : document.getElementById('btnBackToLobby')
+  };
+
+  // Simple state tracking
+  const State = {
+    current      : 'main',   // main, settings, lobby, in-game, pause, end
+    isHost       : false,
+    myId         : null,
+    myName       : null,
+    roomCode     : null,
+    peer         : null,
+    connToHost   : null,     // client side only
+    connections  : {},       // host side: peerId → DataConnection
+    world        : {players:{}, builds:[]},
+    myPeerId     : null,     // the PeerJS ID (unique)
+    mouseSens    : 1.0
+  };
+
+  // Helper: switch UI screens
+  function showScreen(name) {
+    // hide all
+    for (const s of [menu.main, menu.settings, menu.lobby, menu.pause, menu.end]) {
+      s.classList.remove('active');
+      s.classList.add('hidden');
+    }
+    // show requested
+    switch(name) {
+      case 'main':     menu.main.classList.remove('hidden'); menu.main.classList.add('active'); break;
+      case 'settings': menu.settings.classList.remove('hidden'); menu.settings.classList.add('active'); break;
+      case 'lobby':   menu.lobby.classList.remove('hidden'); menu.lobby.classList.add('active'); break;
+      case 'pause':    menu.pause.classList.remove('hidden'); menu.pause.classList.add('active'); break;
+      case 'end':      menu.end.classList.remove('hidden'); menu.end.classList.add('active'); break;
+    }
+    State.current = name;
+    // hide HUD unless in-game
+    if (name === 'in-game') menu.hud.classList.remove('hidden');
+    else menu.hud.classList.add('hidden');
+  }
+
+  // ----- Settings (mouse sensitivity) -----
+  menu.rangeSens.addEventListener('input', e => {
+    State.mouseSens = parseFloat(e.target.value);
+  });
+
+  // ----- Main menu button handlers -----
+  menu.btnCreateRoom.addEventListener('click', () => {
+    createRoom();
+  });
+  menu.btnJoinRoom.addEventListener('click', () => {
+    const code = prompt('Enter room code (4‑digit):');
+    if (code) joinRoom(code);
+  });
+  menu.btnSettings.addEventListener('click', () => showScreen('settings'));
+  menu.btnBackFromSettings.addEventListener('click', () => showScreen('main'));
+
+  // ----- Lobby button handlers -----
+  menu.btnLeaveLobby.addEventListener('click', () => {
+    leaveRoom();
+  });
+  menu.btnStartGame.addEventListener('click', () => {
+    if (State.isHost) {
+      // host sends start signal to everyone
+      broadcast({type:'start'});
+      // also locally transition
+      startMatch();
+    }
+  });
+
+  // ----- Pause / end handlers -----
+  menu.btnResume.addEventListener('click', () => {
+    hidePause();
+  });
+  menu.btnPauseSettings.addEventListener('click', () => showScreen('settings'));
+  menu.btnLeaveMatch.addEventListener('click', () => {
+    // leave the match and go back to lobby
+    leaveMatch();
+  });
+  menu.btnPlayAgain.addEventListener('click', () => {
+    // for simplicity we go back to lobby and recreate a new room
+    leaveMatch();
+  });
+  menu.btnBackToLobby.addEventListener('click', () => {
+    // just hide end screen and go back to lobby
+    showScreen('lobby');
+  });
+
+  // ============================================================
+  // === THREE.JS SETUP ==========================================
+  // ============================================================
+  const canvas = document.getElementById('gameCanvas');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x202020);
+
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 500);
+  // Camera will follow the local player
+  const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+  scene.add(ambient);
+  const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+  directional.position.set(10,20,10);
+  directional.castShadow = true;
+  directional.shadow.mapSize.width = 1024;
+  directional.shadow.mapSize.height = 1024;
+  scene.add(directional);
+  // Ground plane
+  const groundGeo = new THREE.PlaneGeometry(200,200);
+  const groundMat = new THREE.MeshStandardMaterial({color:0x555555});
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Resize handler
+  window.addEventListener('resize', () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w,h);
+    camera.aspect = w/h;
+    camera.updateProjectionMatrix();
+  });
+
+  // ============================================================
+  // === PLAYER / INPUT ==========================================
+  // ============================================================
+  let myMesh = null;      // local player mesh
+  let myYaw = 0;          // horizontal rotation (radians)
+  let velocityY = 0;     // vertical speed for jump/fall
+  const move = {forward:0, back:0, left:0, right:0, jump:false};
+
+  // Key handling (WASD, space, build keys)
+  const keyDown = (e) => {
+    switch(e.code) {
+      case 'KeyW': case 'ArrowUp':   move.forward = 1; break;
+      case 'KeyS': case 'ArrowDown': move.back = 1; break;
+      case 'KeyA': case 'ArrowLeft': move.left = 1; break;
+      case 'KeyD': case 'ArrowRight': move.right = 1; break;
+      case 'Space': move.jump = true; break;
+      case 'KeyQ': selectBuild('wall'); break;
+      case 'KeyC': selectBuild('floor'); break;
+      case 'KeyV': selectBuild('ramp'); break;
+      case 'ShiftLeft': case 'ShiftRight': selectBuild('roof'); break;
+    }
+  };
+  const keyUp = (e) => {
+    switch(e.code) {
+      case 'KeyW': case 'ArrowUp':   move.forward = 0; break;
+      case 'KeyS': case 'ArrowDown': move.back = 0; break;
+      case 'KeyA': case 'ArrowLeft': move.left = 0; break;
+      case 'KeyD': case 'ArrowRight': move.right = 0; break;
+      case 'Space': move.jump = false; break;
+    }
+  };
+  window.addEventListener('keydown', keyDown);
+  window.addEventListener('keyup', keyUp);
+
+  // Mouse look – pointer lock
+  canvas.requestPointerLock = canvas.requestPointerLock ||
+                             canvas.mozRequestPointerLock;
+  document.exitPointerLock = document.exitPointerLock ||
+                             document.mozExitPointerLock;
+  canvas.addEventListener('click', () => {
+    if (!document.pointerLockElement) canvas.requestPointerLock();
+  });
+  document.addEventListener('pointerlockchange', () => {
+    const locked = document.pointerLockElement === canvas;
+    // Could show UI hint if needed
+  });
+  const mouseMove = (e) => {
+    if (document.pointerLockElement !== canvas) return;
+    const sensitivity = 0.002 * State.mouseSens;
+    myYaw -= e.movementX * sensitivity;
+    // keep myYaw within -π..π (optional)
+    if (myYaw > Math.PI) myYaw -= 2*Math.PI;
+    if (myYaw < -Math.PI) myYaw += 2*Math.PI;
+  };
+  document.addEventListener('mousemove', mouseMove);
+
+  // Shooting (left click) and building (right click)
+  const leftClick = (e) => {
+    if (e.button !== 0) return;
+    fireShot();
+  };
+  const rightClick = (e) => {
+    if (e.button !== 2) return;
+    attemptPlaceBuild();
+  };
+  canvas.addEventListener('mousedown', leftClick);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('mousedown', rightClick);
+
+  // ---- Build preview ----
+  let previewMesh = null;
+  function createPreviewMesh() {
+    if (previewMesh) scene.remove(previewMesh);
+    const geom = new THREE.BoxGeometry(1.8,1.8,1.8);
+    const mat = new THREE.MeshBasicMaterial({color:0xffffff,opacity:0.4,transparent:true});
+    previewMesh = new THREE.Mesh(geom, mat);
+    previewMesh.visible = false;
+    scene.add(previewMesh);
+  }
+  createPreviewMesh();
+
+  function updatePreview() {
+    if (!State.selectedBuild) {
+      previewMesh.visible = false;
+      return;
+    }
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0,0), camera);
+    // intersect with ground and existing builds
+    const objs = [ground];
+    // also allow snapping to other builds (optional)
+    for (const b of Object.values(State.world.builds)) {
+      // we don't have separate meshes for each build yet; we'll ignore for preview.
+    }
+    const hits = ray.intersectObjects(objs, true);
+    if (hits.length === 0) {
+      previewMesh.visible = false;
+      return;
+    }
+    const pt = hits[0].point.clone();
+    pt.x = Math.round(pt.x/GRID_SIZE)*GRID_SIZE;
+    pt.y = Math.round(pt.y/GRID_SIZE)*GRID_SIZE;
+    pt.z = Math.round(pt.z/GRID_SIZE)*GRID_SIZE;
+    previewMesh.position.copy(pt);
+    previewMesh.visible = true;
+  }
+
+  // ---- Build selection UI ----
+  function selectBuild(type) {
+    State.selectedBuild = type;
+    menu.buildSelected.textContent = type;
+  }
+
+  // ---- Shooting logic (client side visual) ----
+  function fireShot() {
+    // Visual: a short red line from camera forward (for demo)
+    const origin = new THREE.Vector3();
+    const dir = new THREE.Vector3();
+    camera.getWorldPosition(origin);
+    camera.getWorldDirection(dir);
+    const length = 100; // far ray
+    const end = origin.clone().addScaledVector(dir, length);
+    const material = new THREE.LineBasicMaterial({color:0xff0000});
+    const geometry = new THREE.BufferGeometry().setFromPoints([origin, end]);
+    const line = new THREE.Line(geometry, material);
+    scene.add(line);
+    setTimeout(() => scene.remove(line), 100); // remove after 0.1s
+
+    // Send to host for hit detection
+    if (State.isHost) {
+      // host can compute directly
+      handleShootFromPeer(State.myId, origin, dir);
+    } else if (State.connToHost) {
+      State.connToHost.send({type:'shoot', origin:origin.toArray(), dir:dir.toArray()});
+    }
+  }
+
+  // ---- Build placement (right click) ----
+  function attemptPlaceBuild() {
+    if (!State.selectedBuild) return;
+    // Raycast to get placement point
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0,0), camera);
+    const hits = ray.intersectObjects([ground], true);
+    if (hits.length === 0) return;
+    const pt = hits[0].point.clone();
+    pt.x = Math.round(pt.x/GRID_SIZE)*GRID_SIZE;
+    pt.y = Math.round(pt.y/GRID_SIZE)*GRID_SIZE;
+    pt.z = Math.round(pt.z/GRID_SIZE)*GRID_SIZE;
+    const rotY = Math.round(myYaw/(Math.PI/2))*(Math.PI/2);
+    if (State.isHost) {
+      // host directly creates build
+      const build = {type:State.selectedBuild, x:pt.x, y:pt.y, z:pt.z, rotY};
+      addBuild(build, State.myId);
+      broadcastWorld();
+    } else {
+      // client asks host to create
+      if (State.connToHost) {
+        State.connToHost.send({type:'build', build:{type:State.selectedBuild, x:pt.x, y:pt.y, z:pt.z, rotY}});
+      }
+    }
+  }
+
+  // ============================================================
+  // === WORLD / NETWORK =========================================
+  // ============================================================
+  // Helper to generate a short random name
+  function randomName() { return 'Player-'+Math.random().toString(36).substr(2,4); }
+
+  // ---------- PeerJS ----------
+
+  function createRoom() {
+    // Host creates a unique room code (4‑digit)
+    const code = Math.floor(1000 + Math.random()*9000).toString();
+    State.roomCode = code;
+    State.isHost = true;
+    State.myName = randomName();
+    State.myPeerId = 'host-'+code; // host's PeerJS ID
+    // Create Peer with that ID
+    State.peer = new Peer(State.myPeerId, {
+      debug: 2
+      // default PeerJS server (0.peerjs.com) works in most cases
+    });
+    // Host side: wait for connections
+    State.peer.on('open', id => {
+      console.log('Host opened with ID', id);
+      // add self to world
+      addPlayerSelf();
+      // UI
+      menu.roomCode.textContent = code;
+      updateLobbyList();
+      menu.btnStartGame.classList.remove('hidden');
+      showScreen('lobby');
+    });
+    State.peer.on('connection', conn => {
+      console.log('New player connected:', conn.peer);
+      State.connections[conn.peer] = conn;
+      // when a client joins, ask for its name
+      conn.on('data', data => handleIncoming(conn, data));
+      conn.on('close', () => {
+        console.log('Connection closed:', conn.peer);
+        delete State.connections[conn.peer];
+        // Remove player from world
+        removePlayer(conn.peer);
+        broadcastWorld();
+        updateLobbyList();
+      });
+    });
+    State.peer.on('error', err => console.error(err));
+  }
+
+  function joinRoom(code) {
+    const hostId = 'host-'+code;
+    State.roomCode = code;
+    State.isHost = false;
+    State.myName = randomName();
+    // generate random peer ID for client
+    const clientId = 'client-'+Math.random().toString(36).substr(2,9);
+    State.myPeerId = clientId;
+    State.peer = new Peer(clientId, {
+      debug: 2
+    });
+    State.peer.on('open', id => {
+      console.log('Client opened with ID', id);
+      // connect to host
+      const conn = State.peer.connect(hostId);
+      State.connToHost = conn;
+      conn.on('open', () => {
+        console.log('Connected to host');
+        // announce self
+        conn.send({type:'join', name:State.myName});
+        // UI
+        menu.roomCode.textContent = code;
+        showScreen('lobby');
+        menu.btnStartGame.classList.add('hidden'); // only host sees start button
+      });
+      conn.on('data', data => handleIncoming(conn, data));
+      conn.on('close', () => {
+        console.log('Disconnected from host');
+        // go back to main menu
+        leaveRoom();
+      });
+    });
+    State.peer.on('error', err => {
+      console.error('Peer error:', err);
+      alert('Could not join room – see console for details.');
+      // fallback to main menu
+      // maybe destroy peer?
+      State.peer.destroy();
+    });
+  }
+
+  function leaveRoom() {
+    // Close connections & peer
+    if (State.isHost) {
+      // tell all clients to go back to lobby?
+      broadcast({type:'roomClosed'});
+      for (const conn of Object.values(State.connections)) {
+        conn.close();
+      }
+    } else if (State.connToHost) {
+      State.connToHost.send({type:'leave'});
+      State.connToHost.close();
+    }
+    if (State.peer) State.peer.destroy();
+    // Reset state
+    State.isHost = false;
+    State.roomCode = null;
+    State.myId = null;
+    State.connections = {};
+    State.connToHost = null;
+    State.world = {players:{}, builds:[]};
+    // UI reset
+    menu.playerList.innerHTML = '';
+    menu.btnStartGame.classList.add('hidden');
+    showScreen('main');
+  }
+
+  // ---------- Helpers for world ----------
+  function addPlayerSelf() {
+    const id = State.isHost ? State.myPeerId : State.myId; // host's ID or later will be assigned
+    // spawn position random but inside arena
+    const spawn = {
+      x: (Math.random() - 0.5) * 30,
+      y: 1,
+      z: (Math.random() - 0.5) * 30,
+      rotationY: 0,
+      health: 100,
+      name: State.myName
+    };
+    State.myId = State.myPeerId; // for self
+    State.world.players[State.myId] = spawn;
+    // create mesh locally
+    createPlayerMesh(State.myId, spawn, true);
+  }
+
+  function createPlayerMesh(id, data, isSelf) {
+    const color = isSelf ? 0x00ff00 : 0x0077ff;
+    const geom = new THREE.BoxGeometry(PLAYER_SIZE.w, PLAYER_SIZE.h, PLAYER_SIZE.d);
+    const mat = new THREE.MeshStandardMaterial({color});
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(data.x, data.y, data.z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    State.world.players[id].mesh = mesh;
+  }
+
+  function removePlayer(id) {
+    const entry = State.world.players[id];
+    if (entry && entry.mesh) {
+      scene.remove(entry.mesh);
+      entry.mesh.geometry.dispose();
+      entry.mesh.material.dispose();
+    }
+    delete State.world.players[id];
+    updateLobbyList();
+  }
+
+  function addBuild(buildInfo, ownerId) {
+    const buildId = nextBuildId++;
+    const build = {
+      id: buildId,
+      type: buildInfo.type,
+      x: buildInfo.x,
+      y: buildInfo.y,
+      z: buildInfo.z,
+      rotY: buildInfo.rotY,
+      ownerId: ownerId
+    };
+    State.world.builds.push(build);
+    // create mesh locally
+    const size = 1.8;
+    const geom = new THREE.BoxGeometry(size,size,size);
+    const mat = new THREE.MeshStandardMaterial({color:BUILD_COLORS[build.type]||0x777});
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(build.x, build.y, build.z);
+    mesh.rotation.y = build.rotY||0;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    build.mesh = mesh;
+  }
+
+  function broadcast(msg) {
+    if (State.isHost) {
+      // send to each client
+      for (const conn of Object.values(State.connections)) {
+        conn.send(msg);
+      }
+    } else {
+      if (State.connToHost) State.connToHost.send(msg);
+    }
+  }
+
+  function broadcastWorld() {
+    const payload = {
+      type:'world',
+      players: {},
+      builds: []
+    };
+    // flatten player data (no mesh)
+    for (const [id, p] of Object.entries(State.world.players)) {
+      payload.players[id] = {
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        rotationY: p.rotationY,
+        health: p.health,
+        name: p.name
+      };
+    }
+    // builds
+    for (const b of State.world.builds) {
+      payload.builds.push({
+        id: b.id,
+        type: b.type,
+        x: b.x,
+        y: b.y,
+        z: b.z,
+        rotY: b.rotY,
+        ownerId: b.ownerId
+      });
+    }
+    broadcast(payload);
+  }
+
+  function handleIncoming(conn, data) {
+    // data may be object
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data); } catch(e) { console.error('Bad JSON', data); return; }
+    }
+    switch(data.type) {
+      case 'join':
+        // client just joined host lobby
+        const newId = conn.peer; // connection ID
+        // store name
+        const playerInfo = {
+          x: (Math.random() - 0.5) * 30,
+          y: 1,
+          z: (Math.random() - 0.5) * 30,
+          rotationY: 0,
+          health: 100,
+          name: data.name || 'Guest'
+        };
+        State.world.players[newId] = playerInfo;
+        // send full world to this newcomer (including self)
+        const full = {
+          type:'world',
+          players: {},
+          builds: []
+        };
+        // populate players data
+        for (const [pid, p] of Object.entries(State.world.players)) {
+          full.players[pid] = {
+            x:p.x, y:p.y, z:p.z,
+            rotationY:p.rotationY,
+            health:p.health,
+            name:p.name
+          };
+        }
+        // builds
+        for (const b of State.world.builds) {
+          full.builds.push({id:b.id, type:b.type, x:b.x, y:b.y, z:b.z, rotY:b.rotY, ownerId:b.ownerId});
+        }
+        conn.send(full);
+        // notify others about the new player
+        broadcastWorld();
+        updateLobbyList();
+        break;
+      case 'move':
+        // client moved
+        const pid = conn.peer;
+        const p = State.world.players[pid];
+        if (p) {
+          p.x = data.x;
+          p.y = data.y;
+          p.z = data.z;
+          p.rotationY = data.rotationY;
+          // broadcast changes to others
+          broadcastWorld();
+        }
+        break;
+      case 'shoot':
+        // client fired a shot
+        handleShootFromPeer(conn.peer,
+          new THREE.Vector3().fromArray(data.origin),
+          new THREE.Vector3().fromArray(data.dir));
+        break;
+      case 'build':
+        // client requests building
+        const buildInfo = data.build;
+        addBuild(buildInfo, conn.peer);
+        broadcastWorld();
+        break;
+      case 'world':
+        // client (or host) receives full world update
+        applyWorldUpdate(data);
+        break;
+      case 'start':
+        // host tells everybody to start match
+        startMatch();
+        break;
+      case 'roomClosed':
+        alert('Host closed the room.');
+        leaveRoom();
+        break;
+      case 'leave':
+        // client says goodbye
+        // already handled via conn close event.
+        break;
+      default:
+        console.warn('Unhandled message type', data.type);
+    }
+  }
+
+  function handleShootFromPeer(shooterId, origin, dir) {
+    // For simplicity, do hitscan against all players except shooter
+    const ray = {ox:origin.x, oy:origin.y, oz:origin.z, dx:dir.x, dy:dir.y, dz:dir.z};
+    let hitId = null;
+    let closest = Infinity;
+    for (const [id, pl] of Object.entries(State.world.players)) {
+      if (id === shooterId) continue;
+      const cx = pl.x, cy = pl.y + PLAYER_SIZE.h/2, cz = pl.z;
+      const r = 0.5;
+      const ocx = ray.ox - cx, ocy = ray.oy - cy, ocz = ray.oz - cz;
+      const a = ray.dx*ray.dx + ray.dy*ray.dy + ray.dz*ray.dz;
+      const b = 2 * (ocx*ray.dx + ocy*ray.dy + ocz*ray.dz);
+      const c = ocx*ocx + ocy*ocy + ocz*ocz - r*r;
+      const disc = b*b - 4*a*c;
+      if (disc < 0) continue;
+      const t = (-b - Math.sqrt(disc)) / (2*a);
+      if (t > 0 && t < closest) {
+        closest = t;
+        hitId = id;
+      }
+    }
+    if (hitId) {
+      const victim = State.world.players[hitId];
+      victim.health -= 20;
+      if (victim.health <= 0) {
+        // respawn
+        victim.x = (Math.random() - 0.5) * 30;
+        victim.y = 1;
+        victim.z = (Math.random() - 0.5) * 30;
+        victim.health = 100;
+      }
+      // broadcast world update
+      broadcastWorld();
+    }
+  }
+
+  function applyWorldUpdate(data) {
+    // data.players is map, data.builds is array
+    // Update players
+    for (const [id, p] of Object.entries(data.players)) {
+      // if we already have mesh, just update position
+      if (State.world.players[id]) {
+        const existing = State.world.players[id];
+        existing.x = p.x; existing.y = p.y; existing.z = p.z;
+        existing.rotationY = p.rotationY;
+        existing.health = p.health;
+        existing.name = p.name;
+        // update mesh
+        if (existing.mesh) {
+          existing.mesh.position.set(p.x,p.y,p.z);
+          existing.mesh.rotation.y = p.rotationY;
+        } else {
+          // create mesh if missing (new remote player)
+          const isSelf = (id===State.myId);
+          createPlayerMesh(id, p, isSelf);
+        }
+      } else {
+        // new player
+        State.world.players[id] = {
+          x:p.x, y:p.y, z:p.z,
+          rotationY:p.rotationY,
+          health:p.health,
+          name:p.name,
+          mesh:null
+        };
+        const isSelf = (id===State.myId);
+        createPlayerMesh(id, p, isSelf);
+      }
+    }
+    // Remove any players that are no longer present
+    for (const id of Object.keys(State.world.players)) {
+      if (!data.players[id]) {
+        removePlayer(id);
+      }
+    }
+    // Update builds
+    // Clear existing builds visuals first
+    for (const b of State.world.builds) {
+      if (b.mesh && scene.getObjectById(b.mesh.id)) {
+        scene.remove(b.mesh);
+        b.mesh.geometry.dispose();
+        b.mesh.material.dispose();
+      }
+    }
+    State.world.builds = [];
+    for (const b of data.builds) {
+      addBuild(b, b.ownerId);
+    }
+    // Update lobby UI (players list)
+    updateLobbyList();
+  }
+
+  function updateLobbyList() {
+    const ul = menu.playerList;
+    ul.innerHTML = '';
+    for (const [id, p] of Object.entries(State.world.players)) {
+      const li = document.createElement('li');
+      const isSelf = (id===State.myId);
+      li.textContent = (isSelf ? '(You) ' : '') + (p.name || id);
+      ul.appendChild(li);
+    }
+  }
+
+  // ----------------------------------------------------
+  // =========== MATCH START / END ======================
+  // ----------------------------------------------------
+  function startMatch() {
+    // Hide any menu overlays, show HUD, enable controls
+    showScreen('in-game');
+    // Reset health HUD
+    menu.healthFill.style.width = '100%';
+    // Reset some flags
+    // Ensure our local mesh exists
+    if (!myMesh) {
+      // the host already called addPlayerSelf which creates mesh
+      // for client, after receiving world, we should have a mesh already.
+      // But just in case:
+      const selfEntry = State.world.players[State.myId];
+      if (selfEntry && selfEntry.mesh) myMesh = selfEntry.mesh;
+    }
+    // Start ticking (already ticking)
+  }
+
+  function endMatch(victory) {
+    // Show end screen; UI decides victory or loss
+    menu.endTitle.textContent = victory ? 'You WON!' : 'You died!';
+    showScreen('end');
+  }
+
+  // ----------------------------------------------------
+  // =========== GAME LOOP (animation & physics) =======
+  // ----------------------------------------------------
+  const clock = new THREE.Clock();
+
+  function tick() {
+    requestAnimationFrame(tick);
+    const dt = clock.getDelta();
+
+    // If we are in a match, update movement, send position, etc.
+    if (State.current === 'in-game' && myMesh) {
+      // ----- movement vector computation -----
+      const dir = new THREE.Vector3();
+      const forward = new THREE.Vector3(Math.sin(myYaw), 0, Math.cos(myYaw));
+      const right = new THREE.Vector3(Math.sin(myYaw + Math.PI/2), 0, Math.cos(myYaw + Math.PI/2));
+      if (move.forward) dir.add(forward);
+      if (move.back)    dir.add(forward.clone().negate());
+      if (move.left)    dir.add(right.clone().negate());
+      if (move.right)   dir.add(right);
+      if (dir.lengthSq() > 0) dir.normalize();
+
+      // Apply movement
+      myMesh.position.x += dir.x * MOVE_SPEED * dt;
+      myMesh.position.z += dir.z * MOVE_SPEED * dt;
+
+      // Simple gravity and jumping
+      if (move.jump && Math.abs(myMesh.position.y - 1) < 0.01) {
+        velocityY = JUMP_SPEED;
+      }
+      velocityY -= GRAVITY * dt;
+      myMesh.position.y += velocityY * dt;
+      if (myMesh.position.y < 1) {
+        myMesh.position.y = 1;
+        velocityY = 0;
+      }
+
+      // Clamp to arena
+      myMesh.position.x = Math.max(-ARENA_LIMIT, Math.min(ARENA_LIMIT, myMesh.position.x));
+      myMesh.position.z = Math.max(-ARENA_LIMIT, Math.min(ARENA_LIMIT, myMesh.position.z));
+
+      // Update camera to follow player
+      const camOffset = new THREE.Vector3(0,5,-8);
+      const q = new THREE.Quaternion();
+      q.setFromEuler(new THREE.Euler(0, myYaw, 0));
+      camOffset.applyQuaternion(q);
+      camera.position.copy(myMesh.position).add(camOffset);
+      camera.lookAt(myMesh.position);
+
+      // Send movement to host (or if host, broadcast)
+      const pos = {
+        x: myMesh.position.x,
+        y: myMesh.position.y,
+        z: myMesh.position.z,
+        rotationY: myYaw
+      };
+      if (State.isHost) {
+        // host updates its own entry
+        const me = State.world.players[State.myId];
+        if (me) {
+          me.x = pos.x; me.y = pos.y; me.z = pos.z; me.rotationY = pos.rotationY;
+          broadcastWorld(); // simple broadcast each frame (could throttle)
+        }
+      } else {
+        // client: send move to host
+        if (State.connToHost && State.connToHost.open) {
+          State.connToHost.send({type:'move', ...pos});
+        }
+      }
+
+      // Update health bar if needed (we'll check health each tick)
+      const selfEntry = State.world.players[State.myId];
+      if (selfEntry) {
+        const healthPct = Math.max(0, selfEntry.health) / 100;
+        menu.healthFill.style.width = healthPct*100 + '%';
+        if (selfEntry.health <= 0) {
+          // dead – notify host already handled; display end screen
+          endMatch(false);
+        }
+      }
+
+      // Update preview mesh for building
+      updatePreview();
+    }
+
+    // Render scene
+    renderer.render(scene, camera);
+  }
+  tick(); // kick off
+
+  // ----------------------------------------------------
+  // =========== INPUT: pause handling ================
+  // ----------------------------------------------------
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Escape') {
+      if (State.current === 'in-game') {
+        // pause
+        showScreen('pause');
+        // Release pointer lock
+        document.exitPointerLock();
+      } else if (State.current === 'pause') {
+        hidePause();
+      }
+    }
+  });
+
+  function hidePause() {
+    // Return to game
+    showScreen('in-game');
+    // Re‑lock pointer
+    canvas.requestPointerLock();
+  }
+
+  // ----------------------------------------------------
+  // =========== INITIAL UI ============================
+  // ----------------------------------------------------
+  showScreen('main');
+
+})(); // end of IIFE
+</script>
+</body>
+</html>
